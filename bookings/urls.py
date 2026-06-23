@@ -2,10 +2,25 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Resource listing and booking
     path('', views.resource_list, name='resource_list'),
     path('resource/<int:resource_id>/', views.resource_detail, name='resource_detail'),
+    
+    # User resource management
+    path('my-resources/', views.my_resources, name='my_resources'),
+    path('resource/create/', views.create_resource, name='create_resource'),
+    path('resource/<int:resource_id>/edit/', views.edit_resource, name='edit_resource'),
+    path('resource/<int:resource_id>/delete/', views.delete_resource, name='delete_resource'),
+    
+    # Admin resource management
+    path('manage-resources/', views.admin_manage_resources, name='admin_manage_resources'),
+    path('manage-resource/<int:resource_id>/status/', views.admin_update_resource_status, name='admin_update_resource_status'),
+    
+    # Booking management
     path('my-bookings/', views.my_bookings, name='my_bookings'),
     path('cancel-booking/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
+    
+    # Authentication
     path('signup/', views.signup, name='signup'),
     
     # API endpoints

@@ -1,0 +1,46 @@
+{% extends 'bookings/base.html' %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 40px auto; text-align: center;">
+
+    <div style="font-size: 64px; margin-bottom: 20px;">🗑️</div>
+    <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 10px;">Delete Resource</h1>
+    <p style="font-size: 0.95rem; color: #6c757d; margin-bottom: 20px;">
+        Are you sure you want to delete <strong>"{{ resource.name }}"</strong>?
+    </p>
+    
+    <div style="background: #f8f9fa; padding: 15px; margin-bottom: 25px; text-align: left;">
+        <p style="font-size: 0.85rem; margin: 5px 0;"><strong>Description:</strong> {{ resource.description|truncatewords:20 }}</p>
+        {% if resource.location %}
+            <p style="font-size: 0.85rem; margin: 5px 0;"><strong>Location:</strong> {{ resource.location }}</p>
+        {% endif %}
+        <p style="font-size: 0.85rem; margin: 5px 0;"><strong>Status:</strong> {{ resource.get_status_display }}</p>
+        <p style="font-size: 0.85rem; margin: 5px 0;"><strong>Created:</strong> {{ resource.created_at|date:"M d, Y" }}</p>
+    </div>
+    
+    {% if resource.booking_set.exists %}
+        <div style="background: #fff3cd; padding: 12px; margin-bottom: 20px; border-left: 4px solid #ffc107; color: #856404; font-size: 0.85rem;">
+            This resource has bookings. Deleting it will remove all associated bookings.
+        </div>
+    {% endif %}
+    
+    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" 
+                    style="padding: 10px 30px; background: #dc3545; color: white; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;"
+                    onmouseover="this.style.background='#c82333'"
+                    onmouseout="this.style.background='#dc3545'">
+                Yes, Delete
+            </button>
+        </form>
+        <a href="{% url 'my_resources' %}" 
+           style="padding: 10px 30px; background: #6c757d; color: white; text-decoration: none; font-size: 0.9rem; font-weight: 600; transition: all 0.2s ease;"
+           onmouseover="this.style.background='#5a6268'"
+           onmouseout="this.style.background='#6c757d'">
+            Cancel
+        </a>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,31 +1,65 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login, authenticate  # Add this line
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth import login, authenticate
 from django.contrib import messages
 from django.http import JsonResponse
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import Resource, Booking
 from .services import BookingService
-from .forms import SignUpForm
+from .forms import SignUpForm, ResourceForm, ResourceStatusForm
 
 @login_required
 def resource_list(request):
-    """List all available resources"""
-    resources = Resource.objects.all()
+    """List all available resources - only show approved resources to regular users"""
+    # Show all resources to staff (admins), only approved to regular users
+    if request.user.is_staff:
+        resources = Resource.objects.all().order_by('-created_at')
+    else:
+        resources = Resource.objects.filter(status='APPROVED').order_by('-created_at')
+    
     return render(request, 'bookings/resource_list.html', {'resources': resources})
 
 @login_required
 def resource_detail(request, resource_id):
     """Show a resource's availability and booking form"""
     resource = get_object_or_404(Resource, id=resource_id)
+    
+    # Check if resource is accessible
+    is_owner = request.user == resource.owner
+    is_admin = request.user.is_staff
+    
+    if resource.status != 'APPROVED':
+        # Allow owners and admins to see their own resources regardless of status
+        if is_owner or is_admin:
+            # Show with status warning only to owners/admins
+            status_message = f"This resource is {resource.get_status_display()}. "
+            if resource.status == 'PENDING':
+                status_message += "It is waiting for admin approval."
+            elif resource.status == 'REJECTED':
+                status_message += "It has been rejected by an admin."
+            elif resource.status == 'INACTIVE':
+                status_message += "It has been deactivated by an admin."
+            messages.warning(request, status_message)
+        else:
+            # Regular users see an unavailable message
+            messages.error(request, "This resource is currently not available for booking.")
+            return redirect('resource_list')
+    
     today = timezone.now().date()
-    return render(request, 'bookings/resource_detail.html', {
+    tomorrow = today + timedelta(days=1)
+    
+    context = {
         'resource': resource,
         'today': today,
-    })
+        'tomorrow': tomorrow,
+        'is_owner': is_owner,
+        'is_admin': is_admin,
+        'show_status': is_owner or is_admin,  # Only show status to owners/admins
+    }
+    return render(request, 'bookings/resource_detail.html', context)
 
 @login_required
 def get_available_times(request):
@@ -203,3 +237,143 @@ def signup(request):
         form = SignUpForm()
     
     return render(request, 'registration/signup.html', {'form': form})
+
+@login_required
+def my_resources(request):
+    """View for users to see and manage their own resources"""
+    resources = Resource.objects.filter(owner=request.user).order_by('-created_at')
+    
+    # Get filter from query params
+    status_filter = request.GET.get('status', 'all')
+    if status_filter != 'all':
+        resources = resources.filter(status=status_filter)
+    
+    # Get statistics
+    total = Resource.objects.filter(owner=request.user).count()
+    approved = Resource.objects.filter(owner=request.user, status='APPROVED').count()
+    pending = Resource.objects.filter(owner=request.user, status='PENDING').count()
+    rejected = Resource.objects.filter(owner=request.user, status='REJECTED').count()
+    inactive = Resource.objects.filter(owner=request.user, status='INACTIVE').count()
+    
+    context = {
+        'resources': resources,
+        'total': total,
+        'approved': approved,
+        'pending': pending,
+        'rejected': rejected,
+        'inactive': inactive,
+        'current_filter': status_filter,
+    }
+    return render(request, 'bookings/my_resources.html', context)
+
+@login_required
+def create_resource(request):
+    """View for users to create a new resource"""
+    if request.method == 'POST':
+        form = ResourceForm(request.POST, request.FILES)  # Make sure request.FILES is included
+        if form.is_valid():
+            resource = form.save(commit=False)
+            resource.owner = request.user
+            resource.status = 'APPROVED'
+            resource.save()
+            
+            # Debug: Check if image was saved
+            if resource.image:
+                print(f"Image saved: {resource.image.url}")
+            else:
+                print("No image was saved")
+            
+            messages.success(request, f'Resource "{resource.name}" created successfully!')
+            return redirect('my_resources')
+        else:
+            # Debug: Print form errors
+            print(f"Form errors: {form.errors}")
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ResourceForm()
+    
+    return render(request, 'bookings/resource_form.html', {'form': form, 'title': 'Create Resource'})
+
+@login_required
+def edit_resource(request, resource_id):
+    """View for users to edit their own resources"""
+    resource = get_object_or_404(Resource, id=resource_id)
+    
+    # Check if user owns this resource or is staff
+    if resource.owner != request.user and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to edit this resource.')
+        return redirect('my_resources')
+    
+    if request.method == 'POST':
+        form = ResourceForm(request.POST, instance=resource)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Resource "{resource.name}" updated successfully!')
+            return redirect('my_resources')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ResourceForm(instance=resource)
+    
+    return render(request, 'bookings/resource_form.html', {
+        'form': form, 
+        'resource': resource,
+        'title': 'Edit Resource'
+    })
+
+@login_required
+def delete_resource(request, resource_id):
+    """View for users to delete their own resources"""
+    resource = get_object_or_404(Resource, id=resource_id)
+    
+    # Check if user owns this resource or is staff
+    if resource.owner != request.user and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to delete this resource.')
+        return redirect('my_resources')
+    
+    # Check if there are any bookings for this resource
+    bookings = Booking.objects.filter(resource=resource, status__in=['PENDING', 'CONFIRMED'])
+    if bookings.exists():
+        messages.error(request, f'Cannot delete "{resource.name}" because it has active bookings.')
+        return redirect('my_resources')
+    
+    if request.method == 'POST':
+        resource_name = resource.name
+        resource.delete()
+        messages.success(request, f'Resource "{resource_name}" deleted successfully.')
+        return redirect('my_resources')
+    
+    return render(request, 'bookings/resource_confirm_delete.html', {'resource': resource})
+
+# Admin view to manage all resources
+@user_passes_test(lambda u: u.is_staff)
+def admin_manage_resources(request):
+    """Admin view to manage all resources"""
+    resources = Resource.objects.all().order_by('-created_at')
+    
+    # Get filter from query params
+    status_filter = request.GET.get('status', 'all')
+    if status_filter != 'all':
+        resources = resources.filter(status=status_filter)
+    
+    context = {
+        'resources': resources,
+        'status_filter': status_filter,
+        'status_choices': Resource.STATUS_CHOICES,
+    }
+    return render(request, 'bookings/admin_manage_resources.html', context)
+
+@user_passes_test(lambda u: u.is_staff)
+def admin_update_resource_status(request, resource_id):
+    """Admin view to update resource status"""
+    resource = get_object_or_404(Resource, id=resource_id)
+    
+    if request.method == 'POST':
+        form = ResourceStatusForm(request.POST, instance=resource)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Resource "{resource.name}" status updated to {resource.get_status_display()}.')
+        else:
+            messages.error(request, 'Failed to update resource status.')
+    
+    return redirect('admin_manage_resources')

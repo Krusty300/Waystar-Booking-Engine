@@ -1,11 +1,121 @@
 {% extends 'bookings/base.html' %}
 
 {% block content %}
-<h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 5px;">{{ resource.name }}</h1>
-<p style="font-size: 0.9rem; color: #6c757d; margin-top: 0; margin-bottom: 20px;">{{ resource.description }}</p>
+<!-- Image -->
+<div style="flex: 0 0 300px; max-width: 100%;">
+    <div style="background: #e9ecef; overflow: hidden; position: relative; min-height: 200px;">
+        {% if resource.image %}
+            <img src="{{ resource.image.url }}" alt="{{ resource.name }}" 
+                 style="width: 100%; height: 100%; object-fit: cover; min-height: 200px;">
+        {% elif resource.image_url %}
+            <img src="{{ resource.image_url }}" alt="{{ resource.name }}" 
+                 style="width: 100%; height: 100%; object-fit: cover; min-height: 200px;">
+        {% else %}
+            <img src="/static/bookings/images/default-resource.png" alt="No image available" 
+                 style="width: 100%; height: 100%; object-fit: cover; min-height: 200px;">
+        {% endif %}
+        
+        <!-- Status Badge on Image -->
+        {% if resource.status != 'APPROVED' %}
+            <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 4px 14px; font-size: 0.7rem; font-weight: 600;">
+                {{ resource.get_status_display }}
+            </div>
+        {% endif %}
+    </div>
+</div>
+    
+    <!-- Resource Info -->
+    <div style="flex: 1; min-width: 250px;">
+        <h1 style="font-size: 1.6rem; font-weight: 800; margin: 0 0 5px 0;">{{ resource.name }}</h1>
+        <p style="font-size: 0.9rem; color: #6c757d; margin: 0 0 10px 0;">{{ resource.description }}</p>
+        
+        {% if resource.location %}
+            <p style="font-size: 0.85rem; margin: 5px 0;">📍 <strong>Location:</strong> {{ resource.location }}</p>
+        {% endif %}
+        
+        {% if resource.max_capacity %}
+            <p style="font-size: 0.85rem; margin: 5px 0;">👥 <strong>Capacity:</strong> {{ resource.max_capacity }} people</p>
+        {% endif %}
+        
+        {% if resource.price_per_hour %}
+            <p style="font-size: 1.1rem; font-weight: 700; color: #28a745; margin: 10px 0;">
+                ${{ resource.price_per_hour }}/hour
+            </p>
+        {% endif %}
+        
+        <p style="font-size: 0.75rem; color: #999; margin-top: 10px;">
+            Created: {{ resource.created_at|date:"M d, Y" }} by {{ resource.owner.username }}
+        </p>
+    </div>
+</div>
+
+<!-- Status Indicator - Only visible to resource owners and admins -->
+{% if show_status and resource.status != 'APPROVED' %}
+    <div id="statusIndicator" style="margin: 10px 0 20px 0; padding: 12px 15px; 
+        background: 
+        {% if resource.status == 'PENDING' %}#fff3cd; border-left: 4px solid #ffc107;{% endif %}
+        {% if resource.status == 'REJECTED' %}#f8d7da; border-left: 4px solid #dc3545;{% endif %}
+        {% if resource.status == 'INACTIVE' %}#e9ecef; border-left: 4px solid #6c757d;{% endif %}
+        display: flex; justify-content: space-between; align-items: center; transition: all 0.5s ease;">
+        
+        <div>
+            <strong>Status:</strong> 
+            {% if resource.status == 'PENDING' %}
+                <span style="color: #856404;">⏳ Pending - Waiting for admin approval</span>
+            {% elif resource.status == 'REJECTED' %}
+                <span style="color: #dc3545;">❌ Rejected - This resource has been rejected by an admin</span>
+            {% else %}
+                <span style="color: #6c757d;">⛔ Inactive - This resource has been deactivated by an admin</span>
+            {% endif %}
+        </div>
+        
+        <button onclick="dismissStatus()" 
+                style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #6c757d; padding: 0 5px;"
+                onmouseover="this.style.color='#333'"
+                onmouseout="this.style.color='#6c757d'">
+            &times;
+        </button>
+    </div>
+{% endif %}
+
+<!-- For approved resources, show a subtle "Available" badge to everyone -->
+{% if resource.status == 'APPROVED' %}
+    <div style="margin: 10px 0 20px 0; padding: 8px 15px; background: #d4edda; border-left: 4px solid #28a745; display: flex; align-items: center;">
+        <span style="color: #28a745; font-weight: 600;">✅ Available for booking</span>
+    </div>
+{% endif %}
+
+<!-- Messages with Auto-Dismiss -->
+<div id="messages-container">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="message-container" style="padding: 12px 40px 12px 15px; margin: 10px 0; 
+                {% if message.tags == 'success' %}background: #d4edda; border-left: 4px solid #28a745; color: #155724;
+                {% elif message.tags == 'error' %}background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24;
+                {% elif message.tags == 'warning' %}background: #fff3cd; border-left: 4px solid #ffc107; color: #856404;
+                {% else %}background: #d1ecf1; border-left: 4px solid #17a2b8; color: #0c5460;{% endif %}
+                position: relative; transition: all 0.5s ease;">
+                {{ message }}
+                <button onclick="dismissMessage(this)" 
+                        class="message-dismiss"
+                        style="position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+                               background: none; border: none; font-size: 1.2rem; cursor: pointer; color: inherit; opacity: 0.7;"
+                        onmouseover="this.style.opacity='1'"
+                        onmouseout="this.style.opacity='0.7'">
+                    &times;
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
 
 <div style="margin: 20px 0; padding: 18px; background: #f8f9fa;">
-    <h3 style="font-size: 1rem; font-weight: 700; margin: 0 0 12px 0;">Check Availability</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+        <h3 style="font-size: 1rem; font-weight: 700; margin: 0;">📅 Check Availability</h3>
+        <span style="font-size: 0.7rem; color: #6c757d; background: #e9ecef; padding: 3px 10px; font-weight: 600;">
+            🕐 Nairobi (UTC+3)
+        </span>
+    </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <label for="datepicker" style="font-size: 0.85rem; font-weight: 600;">Select Date:</label>
         <input type="date" id="datepicker" value="{{ today|date:'Y-m-d' }}" min="{{ today|date:'Y-m-d' }}"
@@ -26,6 +136,52 @@
 <div id="booking-message"></div>
 
 <script>
+// Dismiss status indicator
+function dismissStatus() {
+    const indicator = document.getElementById('statusIndicator');
+    if (indicator) {
+        indicator.style.opacity = '0';
+        indicator.style.transform = 'translateY(-10px)';
+        setTimeout(function() {
+            indicator.style.display = 'none';
+        }, 500);
+    }
+}
+
+// Dismiss individual message
+function dismissMessage(button) {
+    const container = button.closest('.message-container');
+    if (container) {
+        container.classList.add('fade-out');
+        setTimeout(function() {
+            container.remove();
+        }, 500);
+    }
+}
+
+// Auto-dismiss messages after delay
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-dismiss status indicator after 5 seconds (only for owners/admins)
+    const statusIndicator = document.getElementById('statusIndicator');
+    if (statusIndicator) {
+        setTimeout(function() {
+            dismissStatus();
+        }, 5000);
+    }
+    
+    // Auto-dismiss flash messages
+    const messages = document.querySelectorAll('.message-container');
+    messages.forEach(function(message, index) {
+        const delay = 4000 + (index * 500);
+        setTimeout(function() {
+            message.classList.add('fade-out');
+            setTimeout(function() {
+                message.remove();
+            }, 500);
+        }, delay);
+    });
+});
+
 let selectedSlot = null;
 
 function loadSlots() {
@@ -48,17 +204,26 @@ function loadSlots() {
                 return;
             }
             
-            let html = '<h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px;">Available Time Slots</h3><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">';
-            let hasAvailable = false;
+            let html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">';
+            html += '<h3 style="font-size: 1rem; font-weight: 700; margin: 0;">Available Time Slots</h3>';
+            html += '<span style="font-size: 0.65rem; color: #6c757d; background: #e9ecef; padding: 2px 10px; font-weight: 600;">🕐 Nairobi (UTC+3)</span>';
+            html += '</div>';
+            html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">';
             
+            let hasAvailable = false;
             const now = new Date();
+            const options = { hour: '2-digit', minute: '2-digit', hour12: true };
             
             data.slots.forEach(slot => {
-                const slotDate = new Date(slot.start);
-                const isPast = slotDate < now;
+                const startDate = new Date(slot.start);
+                const endDate = new Date(slot.end);
+                const isPast = startDate < now;
+                
+                const startDisplay = startDate.toLocaleTimeString([], options);
+                const endDisplay = endDate.toLocaleTimeString([], options);
                 
                 let status = 'booked';
-                let displayText = `${slot.start_display} - ${slot.end_display}`;
+                let displayText = `${startDisplay} - ${endDisplay}`;
                 let clickable = false;
                 
                 if (slot.available && !isPast) {
@@ -149,7 +314,10 @@ function selectSlot(start, end) {
         if (selectedSlot) {
             const display = document.getElementById('selected-slot-display');
             if (display) {
-                display.textContent = `${new Date(start).toLocaleTimeString()} - ${new Date(end).toLocaleTimeString()}`;
+                const startDate = new Date(start);
+                const endDate = new Date(end);
+                const options = { hour: '2-digit', minute: '2-digit', hour12: true };
+                display.textContent = `${startDate.toLocaleTimeString([], options)} - ${endDate.toLocaleTimeString([], options)} (UTC+3)`;
             }
             actions.style.display = 'block';
         } else {
@@ -278,6 +446,20 @@ document.addEventListener('DOMContentLoaded', loadSlots);
     
     #datepicker {
         box-sizing: border-box;
+    }
+    
+    .message-container {
+        transition: all 0.5s ease;
+    }
+    .message-container.fade-out {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    
+    @media (max-width: 768px) {
+        .resource-image {
+            flex: 0 0 100% !important;
+        }
     }
     
     @media (max-width: 480px) {

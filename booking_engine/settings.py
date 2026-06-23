@@ -129,3 +129,10 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Prints email
 
 # Password reset settings
 PASSWORD_RESET_TIMEOUT = 86400  # 24 hours in seconds
+
+# Media files (User uploaded files)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Maximum file upload size (5MB)
+MAX_UPLOAD_SIZE = 5242880
