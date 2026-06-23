@@ -1,0 +1,305 @@
+{% extends 'bookings/base.html' %}
+
+{% block content %}
+<h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 5px;">{{ resource.name }}</h1>
+<p style="font-size: 0.9rem; color: #6c757d; margin-top: 0; margin-bottom: 20px;">{{ resource.description }}</p>
+
+<div style="margin: 20px 0; padding: 18px; background: #f8f9fa;">
+    <h3 style="font-size: 1rem; font-weight: 700; margin: 0 0 12px 0;">Check Availability</h3>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <label for="datepicker" style="font-size: 0.85rem; font-weight: 600;">Select Date:</label>
+        <input type="date" id="datepicker" value="{{ today|date:'Y-m-d' }}" min="{{ today|date:'Y-m-d' }}"
+               style="padding: 8px 12px; border: 2px solid #e9ecef; font-size: 0.85rem;">
+        <button onclick="loadSlots()" 
+                style="padding: 8px 18px; background: #007bff; color: white; border: none; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;"
+                onmouseover="this.style.background='#0056b3'"
+                onmouseout="this.style.background='#007bff'">
+            Check Availability
+        </button>
+    </div>
+</div>
+
+<div id="slots-container" style="margin: 20px 0;">
+    <p style="font-size: 0.85rem; color: #6c757d;">Select a date to see available time slots.</p>
+</div>
+
+<div id="booking-message"></div>
+
+<script>
+let selectedSlot = null;
+
+function loadSlots() {
+    const date = document.getElementById('datepicker').value;
+    if (!date) {
+        document.getElementById('slots-container').innerHTML = '<p style="font-size: 0.85rem;">Please select a date.</p>';
+        return;
+    }
+    
+    const resourceId = {{ resource.id }};
+    const url = `/api/available-times/?resource_id=${resourceId}&date=${date}`;
+    
+    document.getElementById('slots-container').innerHTML = '<p style="font-size: 0.85rem;">Loading available slots...</p>';
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('slots-container').innerHTML = `<p class="error" style="font-size: 0.85rem;">${data.error}</p>`;
+                return;
+            }
+            
+            let html = '<h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px;">Available Time Slots</h3><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">';
+            let hasAvailable = false;
+            
+            const now = new Date();
+            
+            data.slots.forEach(slot => {
+                const slotDate = new Date(slot.start);
+                const isPast = slotDate < now;
+                
+                let status = 'booked';
+                let displayText = `${slot.start_display} - ${slot.end_display}`;
+                let clickable = false;
+                
+                if (slot.available && !isPast) {
+                    status = 'available';
+                    displayText += ' ✅';
+                    clickable = true;
+                    hasAvailable = true;
+                } else if (slot.available && isPast) {
+                    status = 'past';
+                    displayText += ' ⏰';
+                    clickable = false;
+                } else {
+                    status = 'booked';
+                    displayText += ' ❌';
+                    clickable = false;
+                }
+                
+                const clickHandler = clickable ? `onclick="selectSlot('${slot.start}', '${slot.end}')"` : '';
+                html += `<div class="slot ${status}" ${clickHandler} data-start="${slot.start}" style="font-size: 0.8rem; padding: 8px 12px;">
+                    ${displayText}
+                </div>`;
+            });
+            html += '</div>';
+            
+            if (!hasAvailable) {
+                html += '<p style="margin-top: 15px; font-size: 0.85rem; color: #6c757d;">No available slots on this date. Please try another day.</p>';
+            }
+            
+            html += `
+                <div id="booking-actions" style="margin-top: 20px; display: none; padding: 15px; background: #e8f4f8;">
+                    <p style="font-size: 0.85rem; font-weight: 600; margin: 0 0 10px 0;"><strong>Selected:</strong> <span id="selected-slot-display"></span></p>
+                    
+                    <div style="margin: 12px 0;">
+                        <label for="booking_notes" style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.8rem;">📝 Additional Notes (Optional):</label>
+                        <textarea id="booking_notes" 
+                                  style="width: 100%; padding: 8px 12px; border: 2px solid #e9ecef; font-size: 0.8rem; font-family: 'Mona Sans', sans-serif; min-height: 50px; resize: vertical;"
+                                  placeholder="Add any special requests or notes for this booking..."
+                                  onfocus="this.style.borderColor='#007bff'"
+                                  onblur="this.style.borderColor='#e9ecef'"></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="confirmBooking()" 
+                                style="padding: 8px 20px; background: #28a745; color: white; border: none; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;"
+                                onmouseover="this.style.background='#218838'"
+                                onmouseout="this.style.background='#28a745'">
+                            ✅ Confirm Booking
+                        </button>
+                        <button onclick="cancelSelection()" 
+                                style="padding: 8px 20px; background: #dc3545; color: white; border: none; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;"
+                                onmouseover="this.style.background='#c82333'"
+                                onmouseout="this.style.background='#dc3545'">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('slots-container').innerHTML = html;
+        })
+        .catch(error => {
+            document.getElementById('slots-container').innerHTML = `<p class="error" style="font-size: 0.85rem;">Error loading slots: ${error.message}</p>`;
+        });
+}
+
+function selectSlot(start, end) {
+    const now = new Date();
+    const slotDate = new Date(start);
+    
+    if (slotDate < now) {
+        alert('This time slot has already passed. Please select a future time.');
+        return;
+    }
+    
+    document.querySelectorAll('.slot.selected').forEach(el => el.classList.remove('selected'));
+    
+    const slotElements = document.querySelectorAll('.slot');
+    for (let el of slotElements) {
+        if (el.dataset.start === start) {
+            el.classList.add('selected');
+            selectedSlot = { start, end };
+            break;
+        }
+    }
+    
+    const actions = document.getElementById('booking-actions');
+    if (actions) {
+        if (selectedSlot) {
+            const display = document.getElementById('selected-slot-display');
+            if (display) {
+                display.textContent = `${new Date(start).toLocaleTimeString()} - ${new Date(end).toLocaleTimeString()}`;
+            }
+            actions.style.display = 'block';
+        } else {
+            actions.style.display = 'none';
+        }
+    }
+}
+
+function confirmBooking() {
+    if (!selectedSlot) {
+        alert('Please select a time slot.');
+        return;
+    }
+    
+    const now = new Date();
+    const slotDate = new Date(selectedSlot.start);
+    
+    if (slotDate < now) {
+        alert('This time slot has already passed. Please select a future time.');
+        selectedSlot = null;
+        document.getElementById('booking-actions').style.display = 'none';
+        loadSlots();
+        return;
+    }
+    
+    const notes = document.getElementById('booking_notes') ? document.getElementById('booking_notes').value : '';
+    
+    const formData = new FormData();
+    formData.append('resource_id', {{ resource.id }});
+    formData.append('start_time', selectedSlot.start);
+    formData.append('end_time', selectedSlot.end);
+    formData.append('notes', notes);
+    
+    const messageDiv = document.getElementById('booking-message');
+    if (messageDiv) {
+        messageDiv.innerHTML = '<p style="font-size: 0.85rem;">Processing your booking...</p>';
+    }
+    
+    fetch('/api/book/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            if (messageDiv) {
+                messageDiv.innerHTML = `<p class="error" style="font-size: 0.85rem;">❌ ${data.error}</p>`;
+            }
+            loadSlots();
+        } else {
+            if (messageDiv) {
+                messageDiv.innerHTML = `<p class="success" style="font-size: 0.85rem;">✅ ${data.message}</p>`;
+            }
+            loadSlots();
+            selectedSlot = null;
+            const actions = document.getElementById('booking-actions');
+            if (actions) {
+                actions.style.display = 'none';
+            }
+            const notesField = document.getElementById('booking_notes');
+            if (notesField) {
+                notesField.value = '';
+            }
+        }
+    })
+    .catch(error => {
+        if (messageDiv) {
+            messageDiv.innerHTML = `<p class="error" style="font-size: 0.85rem;">Error: ${error.message}</p>`;
+        }
+    });
+}
+
+function cancelSelection() {
+    selectedSlot = null;
+    document.querySelectorAll('.slot.selected').forEach(el => el.classList.remove('selected'));
+    const actions = document.getElementById('booking-actions');
+    if (actions) {
+        actions.style.display = 'none';
+    }
+    const notesField = document.getElementById('booking_notes');
+    if (notesField) {
+        notesField.value = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadSlots);
+</script>
+
+<style>
+    .slot {
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: 1px solid #ddd;
+        border-radius: 0;
+    }
+    .slot.available {
+        background: #d4edda;
+        border-color: #28a745;
+    }
+    .slot.available:hover {
+        background: #b8daff;
+        border-color: #007bff;
+        transform: translateY(-2px);
+    }
+    .slot.booked {
+        background: #f8d7da;
+        border-color: #dc3545;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+    .slot.past {
+        background: #e9ecef;
+        border-color: #adb5bd;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+    .slot.selected {
+        background: #007bff;
+        color: white;
+        border-color: #0056b3;
+        transform: scale(1.05);
+    }
+    
+    #datepicker {
+        box-sizing: border-box;
+    }
+    
+    @media (max-width: 480px) {
+        h1 {
+            font-size: 1.3rem !important;
+        }
+        .slot {
+            font-size: 0.75rem !important;
+            padding: 6px 10px !important;
+        }
+        #booking-actions {
+            padding: 12px !important;
+        }
+        div[style*="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"] {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        div[style*="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"] input,
+        div[style*="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"] button {
+            width: 100%;
+        }
+    }
+</style>
+
+{% endblock %}

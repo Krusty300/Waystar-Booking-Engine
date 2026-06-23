@@ -1,0 +1,298 @@
+{% extends 'bookings/base.html' %}
+{% load static %}
+
+{% block content %}
+<h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 20px;">My Bookings</h1>
+
+<!-- Statistics Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 18px 0;">
+    <div style="background: #f8f9fa; padding: 12px 14px; border-radius: 0; text-align: center; border-left: 4px solid #007bff;">
+        <div style="font-size: 1.4rem; font-weight: 700; color: #007bff;">{{ total }}</div>
+        <div style="color: #6c757d; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Total Bookings</div>
+    </div>
+    <div style="background: #f8f9fa; padding: 12px 14px; border-radius: 0; text-align: center; border-left: 4px solid #28a745;">
+        <div style="font-size: 1.4rem; font-weight: 700; color: #28a745;">{{ upcoming }}</div>
+        <div style="color: #6c757d; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Upcoming</div>
+    </div>
+    <div style="background: #f8f9fa; padding: 12px 14px; border-radius: 0; text-align: center; border-left: 4px solid #6c757d;">
+        <div style="font-size: 1.4rem; font-weight: 700; color: #6c757d;">{{ past }}</div>
+        <div style="color: #6c757d; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Past</div>
+    </div>
+    <div style="background: #f8f9fa; padding: 12px 14px; border-radius: 0; text-align: center; border-left: 4px solid #dc3545;">
+        <div style="font-size: 1.4rem; font-weight: 700; color: #dc3545;">{{ cancelled }}</div>
+        <div style="color: #6c757d; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Cancelled</div>
+    </div>
+</div>
+
+<!-- Filter Buttons -->
+<div style="margin: 18px 0; display: flex; flex-wrap: wrap; gap: 8px;">
+    <a href="?status=all" class="filter-btn {% if current_filter == 'all' %}active{% endif %}" 
+       style="padding: 6px 14px; border-radius: 0; text-decoration: none; font-size: 0.8rem; font-weight: 600;
+              {% if current_filter == 'all' %}background: #007bff; color: white;{% else %}background: #e9ecef; color: #333;{% endif %}">
+        All
+    </a>
+    <a href="?status=upcoming" class="filter-btn {% if current_filter == 'upcoming' %}active{% endif %}"
+       style="padding: 6px 14px; border-radius: 0; text-decoration: none; font-size: 0.8rem; font-weight: 600;
+              {% if current_filter == 'upcoming' %}background: #28a745; color: white;{% else %}background: #e9ecef; color: #333;{% endif %}">
+        Upcoming ({{ upcoming }})
+    </a>
+    <a href="?status=past" class="filter-btn {% if current_filter == 'past' %}active{% endif %}"
+       style="padding: 6px 14px; border-radius: 0; text-decoration: none; font-size: 0.8rem; font-weight: 600;
+              {% if current_filter == 'past' %}background: #6c757d; color: white;{% else %}background: #e9ecef; color: #333;{% endif %}">
+        📜 Past ({{ past }})
+    </a>
+    <a href="?status=cancelled" class="filter-btn {% if current_filter == 'cancelled' %}active{% endif %}"
+       style="padding: 6px 14px; border-radius: 0; text-decoration: none; font-size: 0.8rem; font-weight: 600;
+              {% if current_filter == 'cancelled' %}background: #dc3545; color: white;{% else %}background: #e9ecef; color: #333;{% endif %}">
+        Cancelled ({{ cancelled }})
+    </a>
+</div>
+
+<!-- Bookings Table -->
+{% if bookings %}
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 10px 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Resource</th>
+                    <th style="padding: 10px 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Date & Time</th>
+                    <th style="padding: 10px 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Duration</th>
+                    <th style="padding: 10px 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Status</th>
+                    <th style="padding: 10px 12px; text-align: center; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                    <tr style="border-bottom: 1px solid #dee2e6; font-size: 0.8rem;
+                               {% if booking.start_time < now and booking.status != 'CANCELLED' and booking.status != 'COMPLETED' %}background: #fff8f0;{% endif %}"
+                        data-id="{{ booking.id }}"
+                        data-resource="{{ booking.resource.name }}"
+                        data-start="{{ booking.start_time|date:'M d, Y g:i A' }}"
+                        data-end="{{ booking.end_time|date:'g:i A' }}"
+                        data-duration="{{ booking.start_time|timesince:booking.end_time }}"
+                        data-status="{{ booking.get_status_display }}"
+                        data-notes="{{ booking.notes|default:'No notes provided.'|escapejs }}">
+                        
+                        <td style="padding: 10px 12px;">
+                            <strong style="font-size: 0.85rem;">{{ booking.resource.name }}</strong>
+                        </td>
+                        <td style="padding: 10px 12px;">
+                            <div><strong style="font-size: 0.8rem;">{{ booking.start_time|date:"M d, Y" }}</strong></div>
+                            <div style="color: #6c757d; font-size: 0.7rem;">
+                                {{ booking.start_time|date:"g:i A" }} - {{ booking.end_time|date:"g:i A" }}
+                            </div>
+                            {% if booking.start_time > now %}
+                                {% if booking.start_time|date:"Y-m-d" == now|date:"Y-m-d" %}
+                                    <span style="background: #fff3cd; color: #856404; padding: 1px 8px; border-radius: 0; font-size: 0.65rem; font-weight: 600;">Today</span>
+                                {% elif booking.start_time|date:"Y-m-d" == now|date:"Y-m-d"|add:"1" %}
+                                    <span style="background: #d1ecf1; color: #0c5460; padding: 1px 8px; border-radius: 0; font-size: 0.65rem; font-weight: 600;">Tomorrow</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 12px; font-size: 0.75rem;">
+                            {{ booking.start_time|timesince:booking.end_time }}
+                        </td>
+                        <td style="padding: 10px 12px;">
+                            {% if booking.status == 'CONFIRMED' and booking.start_time > now %}
+                                <span class="status-badge status-confirmed" style="display: inline-block; padding: 3px 10px; border-radius: 0; font-size: 0.7rem; font-weight: 600; background: #d4edda; color: #155724;">
+                                    ✅ Confirmed
+                                </span>
+                            {% elif booking.status == 'CONFIRMED' and booking.start_time <= now %}
+                                <span class="status-badge status-completed" style="display: inline-block; padding: 3px 10px; border-radius: 0; font-size: 0.7rem; font-weight: 600; background: #d1ecf1; color: #0c5460;">
+                                    📌 Completed
+                                </span>
+                            {% elif booking.status == 'PENDING' %}
+                                <span class="status-badge status-pending" style="display: inline-block; padding: 3px 10px; border-radius: 0; font-size: 0.7rem; font-weight: 600; background: #fff3cd; color: #856404;">
+                                    ⏳ Pending
+                                </span>
+                            {% elif booking.status == 'CANCELLED' %}
+                                <span class="status-badge status-cancelled" style="display: inline-block; padding: 3px 10px; border-radius: 0; font-size: 0.7rem; font-weight: 600; background: #f8d7da; color: #721c24;">
+                                    ❌ Cancelled
+                                </span>
+                            {% elif booking.status == 'COMPLETED' %}
+                                <span class="status-badge status-completed" style="display: inline-block; padding: 3px 10px; border-radius: 0; font-size: 0.7rem; font-weight: 600; background: #d1ecf1; color: #0c5460;">
+                                    ✅ Completed
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 12px; text-align: center;">
+                            {% if booking.status != 'CANCELLED' and booking.status != 'COMPLETED' and booking.start_time > now %}
+                                <a href="{% url 'cancel_booking' booking.id %}" 
+                                   onclick="return confirm('Are you sure you want to cancel this booking?')"
+                                   style="background: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 0; font-size: 0.7rem; font-weight: 600; display: inline-block; transition: all 0.2s ease;"
+                                   onmouseover="this.style.background='#c82333'"
+                                   onmouseout="this.style.background='#dc3545'">
+                                    Cancel
+                                </a>
+                            {% elif booking.status == 'CANCELLED' %}
+                                <span style="color: #999; font-size: 0.7rem;">—</span>
+                            {% else %}
+                                <span style="color: #999; font-size: 0.7rem;">—</span>
+                            {% endif %}
+                            
+                            <!-- View Details Button -->
+                            <button onclick="showDetails({{ booking.id }})" 
+                                    style="background: #007bff; color: white; padding: 5px 10px; border: none; border-radius: 0; font-size: 0.7rem; font-weight: 600; cursor: pointer; margin-top: 4px; display: block; width: 100%; transition: all 0.2s ease;"
+                                    onmouseover="this.style.background='#0056b3'"
+                                    onmouseout="this.style.background='#007bff'">
+                                View
+                            </button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div style="text-align: center; padding: 50px 20px; background: #f8f9fa; border-radius: 0; margin-top: 20px;">
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <h3 style="font-size: 1.2rem; color: #333; margin-bottom: 8px;">No bookings yet</h3>
+        <p style="font-size: 0.85rem; color: #6c757d; margin-bottom: 18px;">You haven't made any bookings yet. Start by booking a resource!</p>
+        <a href="{% url 'resource_list' %}" 
+           style="background: #007bff; color: white; padding: 8px 20px; text-decoration: none; border-radius: 0; font-size: 0.85rem; font-weight: 600; display: inline-block; transition: all 0.2s ease;"
+           onmouseover="this.style.background='#0056b3'"
+           onmouseout="this.style.background='#007bff'">
+            Browse Resources
+        </a>
+    </div>
+{% endif %}
+
+<!-- Booking Details Modal -->
+<div id="bookingModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 25px; border-radius: 0; max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto; position: relative;">
+        <button onclick="closeModal()" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 22px; cursor: pointer; color: #999; transition: color 0.2s;"
+                onmouseover="this.style.color='#333'"
+                onmouseout="this.style.color='#999'">
+            &times;
+        </button>
+        <h2 id="modalTitle" style="margin-top: 0; font-size: 1.3rem; font-weight: 700; color: #1a1a2e;">Booking Details</h2>
+        <div id="modalContent">
+            <p style="font-size: 0.85rem;">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Show booking details in modal
+function showDetails(bookingId) {
+    const modal = document.getElementById('bookingModal');
+    const content = document.getElementById('modalContent');
+    const title = document.getElementById('modalTitle');
+    
+    modal.style.display = 'flex';
+    content.innerHTML = '<p style="font-size: 0.85rem;">Loading booking details...</p>';
+    
+    // Find the row with the matching booking ID
+    const rows = document.querySelectorAll('tbody tr');
+    let row = null;
+    for (let r of rows) {
+        if (r.dataset.id == bookingId) {
+            row = r;
+            break;
+        }
+    }
+    
+    if (row) {
+        const resource = row.dataset.resource || 'Unknown';
+        const startTime = row.dataset.start || 'Unknown';
+        const endTime = row.dataset.end || 'Unknown';
+        const duration = row.dataset.duration || 'Unknown';
+        const status = row.dataset.status || 'Unknown';
+        const notes = row.dataset.notes || 'No notes provided.';
+        const id = row.dataset.id || bookingId;
+        
+        title.textContent = `Booking: ${resource}`;
+        content.innerHTML = `
+            <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 0;">
+                <p style="font-size: 0.85rem; margin: 6px 0;"><strong>Resource:</strong> ${resource}</p>
+                <p style="font-size: 0.85rem; margin: 6px 0;"><strong>Date & Time:</strong> ${startTime} - ${endTime}</p>
+                <p style="font-size: 0.85rem; margin: 6px 0;"><strong>Duration:</strong> ${duration}</p>
+                <p style="font-size: 0.85rem; margin: 6px 0;"><strong>Status:</strong> ${status}</p>
+                <p style="font-size: 0.85rem; margin: 6px 0;"><strong>Booking ID:</strong> #${id}</p>
+                <hr style="margin: 12px 0; border: none; border-top: 1px solid #dee2e6;">
+                <div style="background: #fff; padding: 10px 12px; border-radius: 0; border-left: 3px solid #007bff;">
+                    <strong style="font-size: 0.8rem;">📝 Notes:</strong>
+                    <p style="margin: 4px 0 0 0; font-size: 0.8rem; white-space: pre-wrap; word-wrap: break-word; color: #333;">${notes}</p>
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: center; font-size: 0.7rem; color: #999;">
+                Need help? Contact support at support@yourapp.com
+            </div>
+        `;
+    } else {
+        content.innerHTML = '<p style="font-size: 0.85rem;">Booking not found.</p>';
+    }
+}
+
+// Close modal
+function closeModal() {
+    document.getElementById('bookingModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+document.getElementById('bookingModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+</script>
+
+<style>
+/* Responsive design */
+@media (max-width: 768px) {
+    table {
+        font-size: 0.7rem !important;
+    }
+    th, td {
+        padding: 8px !important;
+    }
+    .filter-btn {
+        font-size: 0.7rem !important;
+        padding: 4px 10px !important;
+    }
+    .stat-cards {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.3rem !important;
+    }
+    .stat-cards {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+    }
+    .stat-card {
+        padding: 10px !important;
+    }
+    .stat-number {
+        font-size: 1.2rem !important;
+    }
+}
+
+/* Hover effect for table rows */
+tbody tr:hover {
+    background: #f8f9fa !important;
+}
+
+/* Animation for filter buttons */
+.filter-btn {
+    transition: all 0.2s ease;
+}
+.filter-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Modal animation */
+#bookingModal {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+</style>
+{% endblock %}

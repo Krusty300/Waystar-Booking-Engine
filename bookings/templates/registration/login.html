@@ -1,0 +1,131 @@
+{% extends 'bookings/base.html' %}
+
+{% block content %}
+<div style="max-width: 420px; margin: 30px auto; padding: 0 20px;">
+    
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 30px;">
+        <div style="font-size: 40px; margin-bottom: 8px;">🔐</div>
+        <h1 style="margin: 0; font-size: 1.6rem; font-weight: 800; color: #1a1a2e;">Welcome Back</h1>
+        <p style="color: #6c757d; margin-top: 6px; font-size: 0.85rem;">Sign in to access your bookings</p>
+    </div>
+
+    <!-- Error Messages -->
+    {% if form.errors %}
+        <div style="padding: 10px 14px; margin-bottom: 20px; background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24; font-weight: 500; font-size: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span>Your username and password didn't match. Please try again.</span>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if next %}
+        {% if user.is_authenticated %}
+            <div style="padding: 10px 14px; margin-bottom: 20px; background: #fff3cd; border-left: 4px solid #ffc107; color: #856404; font-size: 0.85rem;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>Your account doesn't have access to this page. Please login with an account that has access.</span>
+                </div>
+            </div>
+        {% else %}
+            <div style="padding: 10px 14px; margin-bottom: 20px; background: #d1ecf1; border-left: 4px solid #17a2b8; color: #0c5460; font-size: 0.85rem;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>Please login to see this page.</span>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+
+    <!-- Login Form -->
+    <form method="post" action="{% url 'login' %}" style="background: white; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+        {% csrf_token %}
+        
+        <!-- Username Field -->
+        <div style="margin-bottom: 16px;">
+            <label for="id_username" style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.8rem; color: #1a1a2e;">
+                Username
+            </label>
+            <input type="text" 
+                   name="username" 
+                   id="id_username" 
+                   required 
+                   placeholder="Enter your username"
+                   style="width: 100%; padding: 10px 12px; border: 2px solid #e9ecef; font-size: 0.85rem; transition: all 0.2s ease;"
+                   onfocus="this.style.borderColor='#007bff'; this.style.boxShadow='0 0 0 3px rgba(0,123,255,0.1)'"
+                   onblur="this.style.borderColor='#e9ecef'; this.style.boxShadow='none'">
+        </div>
+        
+        <!-- Password Field -->
+        <div style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <label for="id_password" style="font-weight: 600; font-size: 0.8rem; color: #1a1a2e;">
+                    Password
+                </label>
+                <a href="{% url 'password_reset' %}" style="color: #007bff; text-decoration: none; font-size: 0.75rem; font-weight: 500; transition: opacity 0.2s ease;"
+                   onmouseover="this.style.opacity='0.8'"
+                   onmouseout="this.style.opacity='1'">
+                    Forgot password?
+                </a>
+            </div>
+            <input type="password" 
+                   name="password" 
+                   id="id_password" 
+                   required 
+                   placeholder="Enter your password"
+                   style="width: 100%; padding: 10px 12px; border: 2px solid #e9ecef; font-size: 0.85rem; transition: all 0.2s ease;"
+                   onfocus="this.style.borderColor='#007bff'; this.style.boxShadow='0 0 0 3px rgba(0,123,255,0.1)'"
+                   onblur="this.style.borderColor='#e9ecef'; this.style.boxShadow='none'">
+        </div>
+        
+        <!-- Remember Me -->
+        <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="remember" style="width: 16px; height: 16px; cursor: pointer;">
+            <label for="remember" style="font-size: 0.8rem; color: #6c757d; cursor: pointer;">Remember me</label>
+        </div>
+        
+        <!-- Submit Button -->
+        <button type="submit" 
+                style="width: 100%; padding: 12px; background: #007bff; color: white; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; letter-spacing: 0.3px;"
+                onmouseover="this.style.background='#0056b3'; this.style.transform='translateY(-1px)'"
+                onmouseout="this.style.background='#007bff'; this.style.transform='none'">
+            Sign In
+        </button>
+        
+        <input type="hidden" name="next" value="{{ next }}">
+    </form>
+
+    <!-- Sign Up Link -->
+    <div style="text-align: center; margin-top: 25px; padding-top: 18px; border-top: 1px solid #e9ecef;">
+        <p style="color: #6c757d; font-size: 0.85rem; margin: 0;">
+            Don't have an account? 
+            <a href="{% url 'signup' %}" style="color: #007bff; text-decoration: none; font-weight: 600; font-size: 0.85rem; transition: opacity 0.2s ease;"
+               onmouseover="this.style.opacity='0.8'"
+               onmouseout="this.style.opacity='1'">
+                Create one now
+            </a>
+        </p>
+        <p style="color: #999; font-size: 0.7rem; margin-top: 8px;">
+            By signing in, you agree to our Terms of Service and Privacy Policy
+        </p>
+    </div>
+
+</div>
+
+<style>
+    input {
+        box-sizing: border-box;
+    }
+    
+    @media (max-width: 480px) {
+        div[style*="max-width: 420px"] {
+            padding: 0 15px;
+        }
+        form {
+            padding: 18px !important;
+        }
+        h1 {
+            font-size: 1.3rem !important;
+        }
+    }
+</style>
+
+{% endblock %}
