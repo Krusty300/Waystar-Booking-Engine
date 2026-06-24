@@ -1,12 +1,12 @@
 {% extends 'bookings/base.html' %}
 
 {% block content %}
-<h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 20px;">Available Resources</h1>
+<h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 20px;">Marketplace: Available Resources</h1>
 
 <!-- Category Filter -->
-<div style="margin: 15px 0 20px 0; padding: 15px; background: #f8f9fa;">
+<div style="margin: 15px 0 20px 0; padding: 15px; background: var(--bg-card);">
     <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;">
-        <span style="font-size: 0.8rem; font-weight: 600; color: #1a1a2e;">Filter by category:</span>
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">Filter by category:</span>
         <a href="?category=all&search={{ search_query }}" 
            style="padding: 4px 14px; background: {% if current_category == 'all' %}#007bff; color: white;{% else %}#e9ecef; color: #333;{% endif %} text-decoration: none; font-size: 0.75rem; font-weight: 600; transition: all 0.2s ease;"
            onmouseover="this.style.opacity='0.8'"
@@ -28,9 +28,9 @@
     <form method="get" style="display: flex; gap: 10px; flex-wrap: wrap;">
         <input type="hidden" name="category" value="{{ current_category }}">
         <input type="text" name="search" placeholder="Search resources by name or description..." value="{{ search_query }}" 
-               style="flex: 1; min-width: 200px; padding: 8px 12px; border: 2px solid #e9ecef; font-size: 0.85rem; font-family: 'Mona Sans', sans-serif; box-sizing: border-box;"
+               style="flex: 1; min-width: 200px; padding: 8px 12px; border: 2px solid var(--input-border); font-size: 0.85rem; font-family: 'Mona Sans', sans-serif; box-sizing: border-box; background: var(--bg-input); color: var(--text-primary);"
                onfocus="this.style.borderColor='#007bff'"
-               onblur="this.style.borderColor='#e9ecef'">
+               onblur="this.style.borderColor='var(--input-border)'">
         <button type="submit" style="padding: 8px 18px; background: #007bff; color: white; border: none; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;"
                 onmouseover="this.style.background='#0056b3'"
                 onmouseout="this.style.background='#007bff'">
@@ -40,13 +40,13 @@
             <a href="?category={{ current_category }}" style="padding: 8px 18px; background: #6c757d; color: white; text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease;"
                onmouseover="this.style.background='#5a6268'"
                onmouseout="this.style.background='#6c757d'">
-            Clear
+                Clear
             </a>
         {% endif %}
     </form>
     
     <!-- Results Count -->
-    <div style="margin-top: 10px; font-size: 0.8rem; color: #6c757d;">
+    <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary);">
         Found <strong>{{ resources|length }}</strong> resource{% if resources|length != 1 %}s{% endif %}
         {% if current_category != 'all' %}
             in category 
@@ -64,16 +64,53 @@
     </div>
 </div>
 
+<!-- Meeting Room Filters (only show when filtering by meeting rooms) -->
+{% if request.GET.type == 'meeting_room' %}
+    <div style="margin: 10px 0 20px 0; padding: 10px 15px; background: var(--bg-hover); border: 1px solid var(--border-color);">
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+            <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">Meeting Room Filters:</span>
+            
+            <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
+                <input type="checkbox" name="has_projector" {% if request.GET.has_projector %}checked{% endif %}>
+                Projector
+            </label>
+            <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
+                <input type="checkbox" name="has_video_conferencing" {% if request.GET.has_video_conferencing %}checked{% endif %}>
+                Video Conferencing
+            </label>
+            <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
+                <input type="checkbox" name="has_wifi" {% if request.GET.has_wifi %}checked{% endif %}>
+                WiFi
+            </label>
+            
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <label style="font-size: 0.8rem; color: var(--text-primary);">Min Capacity:</label>
+                <input type="number" name="capacity_min" value="{{ request.GET.capacity_min }}" style="width: 70px; padding: 4px 8px; border: 2px solid var(--input-border); font-size: 0.8rem; background: var(--bg-input); color: var(--text-primary);">
+            </div>
+            
+            <button type="submit" style="padding: 4px 15px; font-size: 0.8rem; background: #007bff; color: white; border: none; cursor: pointer; transition: all 0.2s ease;"
+                    onmouseover="this.style.background='#0056b3'"
+                    onmouseout="this.style.background='#007bff'">
+                Apply Filters
+            </button>
+        </div>
+    </div>
+{% endif %}
+
 <!-- Resource Cards -->
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px;">
     {% for resource in resources %}
-        <div style="border: 1px solid #e9ecef; background: #fafafa; transition: all 0.2s ease; overflow: hidden;"
+        <div style="border: 1px solid var(--border-color); background: var(--bg-card); transition: all 0.2s ease; overflow: hidden;"
              onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'; this.style.transform='translateY(-2px)'"
              onmouseout="this.style.boxShadow='none'; this.style.transform='none'">
             
             <!-- Resource Image -->
             <div style="height: 200px; background: #e9ecef; overflow: hidden; position: relative;">
-                {% if resource.image %}
+                <!-- Priority: room_photo for meeting rooms, then image, then image_url, then default -->
+                {% if resource.is_meeting_room and resource.room_photo %}
+                    <img src="{{ resource.room_photo.url }}" alt="{{ resource.name }}" 
+                         style="width: 100%; height: 100%; object-fit: cover;">
+                {% elif resource.image %}
                     <img src="{{ resource.image.url }}" alt="{{ resource.name }}" 
                          style="width: 100%; height: 100%; object-fit: cover;">
                 {% elif resource.image_url %}
@@ -82,6 +119,13 @@
                 {% else %}
                     <img src="/static/bookings/images/default-resource.png" alt="No image available" 
                          style="width: 100%; height: 100%; object-fit: cover;">
+                {% endif %}
+                
+                <!-- Meeting Room Badge -->
+                {% if resource.is_meeting_room %}
+                    <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 3px 10px; font-size: 0.6rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                        Meeting Room
+                    </div>
                 {% endif %}
                 
                 <!-- Category Badge on Image -->
@@ -100,15 +144,15 @@
             </div>
             
             <div style="padding: 18px;">
-                <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 8px 0; color: #1a1a2e;">
+                <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 8px 0; color: var(--text-primary);">
                     {{ resource.name }}
                 </h3>
-                <p style="font-size: 0.85rem; color: #6c757d; margin: 0 0 10px 0; line-height: 1.5;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.5;">
                     {{ resource.description|truncatewords:20 }}
                 </p>
                 
                 {% if resource.location %}
-                    <p style="font-size: 0.75rem; color: #6c757d; margin: 0 0 5px 0;">📍 {{ resource.location }}</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 0 0 5px 0;">📍 {{ resource.location }}</p>
                 {% endif %}
                 
                 {% if resource.price_per_hour %}
@@ -116,6 +160,61 @@
                         ${{ resource.price_per_hour }}/hour
                     </p>
                 {% endif %}
+                
+                <!-- Meeting Room Quick Info -->
+                {% if resource.is_meeting_room %}
+                    <div style="margin: 0 0 12px 0; display: flex; flex-wrap: wrap; gap: 4px;">
+                        {% if resource.meeting_room.seating_capacity %}
+                            <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                Seats {{ resource.meeting_room.seating_capacity }}
+                            </span>
+                        {% endif %}
+                        {% if resource.meeting_room.has_projector %}
+                            <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                Projector
+                            </span>
+                        {% endif %}
+                        {% if resource.meeting_room.has_video_conferencing %}
+                            <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                v.c
+                            </span>
+                        {% endif %}
+                        {% if resource.meeting_room.has_wifi %}
+                            <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                Wifi
+                            </span>
+                        {% endif %}
+                        {% if resource.meeting_room.room_number %}
+                            <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                {{ resource.meeting_room.room_number }}
+                            </span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                
+                <!-- Styled Information Box - Created By and Created At -->
+                <div style="font-size: 0.7rem; color: var(--text-secondary); margin: 10px 0 12px 0; padding: 8px 10px; background: var(--bg-hover); border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px;">
+                        <span>Created by: 
+                            {% if resource.owner == user %}
+                                <a href="{% url 'profile' %}" 
+                                   style="color: var(--link-color); text-decoration: none; font-weight: 600; transition: color 0.2s ease;"
+                                   onmouseover="this.style.textDecoration='underline'; this.style.color='var(--link-hover)'"
+                                   onmouseout="this.style.textDecoration='none'; this.style.color='var(--link-color)'">
+                                    {{ resource.owner.username }}
+                                </a>
+                            {% else %}
+                                <span style="font-weight: 600; color: var(--text-primary);">{{ resource.owner.username }}</span>
+                            {% endif %}
+                        </span>
+                        <span>Created: {{ resource.created_at|date:"M d, Y" }}</span>
+                    </div>
+                    {% if resource.updated_at != resource.created_at %}
+                        <div style="margin-top: 3px; font-size: 0.65rem; color: var(--text-secondary); opacity: 0.7;">
+                            Last updated: {{ resource.updated_at|date:"M d, Y" }}
+                        </div>
+                    {% endif %}
+                </div>
                 
                 <a href="{% url 'resource_detail' resource.id %}" 
                    style="display: inline-block; background: #007bff; color: white; padding: 8px 16px; text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease;"
@@ -126,10 +225,10 @@
             </div>
         </div>
     {% empty %}
-        <div style="text-align: center; padding: 60px 20px; background: #f8f9fa; grid-column: 1 / -1;">
-            <div style="font-size: 48px; margin-bottom: 15px;">🔍</div>
-            <h3 style="font-size: 1.2rem; color: #333; margin-bottom: 10px;">No resources found</h3>
-            <p style="font-size: 0.85rem; color: #6c757d; margin-bottom: 15px;">
+        <div style="text-align: center; padding: 60px 20px; background: var(--bg-hover); grid-column: 1 / -1; border: 1px solid var(--border-color);">
+            <div style="font-size: 24px; margin-bottom: 15px;">Search</div>
+            <h3 style="font-size: 1.2rem; color: var(--text-primary); margin-bottom: 10px;">No resources found</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 15px;">
                 {% if search_query %}
                     No resources match your search "{{ search_query }}".
                 {% elif current_category != 'all' %}
@@ -162,6 +261,18 @@
         }
         form input, form button, form a {
             width: 100% !important;
+        }
+        .meeting-room-filters {
+            flex-direction: column !important;
+            align-items: stretch !important;
+        }
+        .meeting-room-filters label {
+            justify-content: flex-start !important;
+        }
+        .created-info {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 3px !important;
         }
     }
 </style>

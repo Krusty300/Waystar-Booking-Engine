@@ -13,35 +13,40 @@
 
 <!-- Statistics Cards -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 15px 0 25px 0;">
-    <div style="background: #f8f9fa; padding: 12px; text-align: center; border-left: 4px solid #007bff;">
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #007bff;">
         <div style="font-size: 1.3rem; font-weight: 700; color: #007bff;">{{ total }}</div>
-        <div style="font-size: 0.7rem; color: #6c757d; text-transform: uppercase; font-weight: 600;">Total</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Total</div>
     </div>
-    <div style="background: #f8f9fa; padding: 12px; text-align: center; border-left: 4px solid #28a745;">
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #28a745;">
         <div style="font-size: 1.3rem; font-weight: 700; color: #28a745;">{{ approved }}</div>
-        <div style="font-size: 0.7rem; color: #6c757d; text-transform: uppercase; font-weight: 600;">Approved</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Approved</div>
     </div>
-    <div style="background: #f8f9fa; padding: 12px; text-align: center; border-left: 4px solid #ffc107;">
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #ffc107;">
         <div style="font-size: 1.3rem; font-weight: 700; color: #ffc107;">{{ pending }}</div>
-        <div style="font-size: 0.7rem; color: #6c757d; text-transform: uppercase; font-weight: 600;">Pending</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Pending</div>
     </div>
-    <div style="background: #f8f9fa; padding: 12px; text-align: center; border-left: 4px solid #dc3545;">
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #dc3545;">
         <div style="font-size: 1.3rem; font-weight: 700; color: #dc3545;">{{ rejected }}</div>
-        <div style="font-size: 0.7rem; color: #6c757d; text-transform: uppercase; font-weight: 600;">Rejected</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Rejected</div>
     </div>
-    <div style="background: #f8f9fa; padding: 12px; text-align: center; border-left: 4px solid #6c757d;">
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #6c757d;">
         <div style="font-size: 1.3rem; font-weight: 700; color: #6c757d;">{{ inactive }}</div>
-        <div style="font-size: 0.7rem; color: #6c757d; text-transform: uppercase; font-weight: 600;">Inactive</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Inactive</div>
     </div>
 </div>
 
 {% if resources %}
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
         {% for resource in resources %}
-            <div style="border: 1px solid #e9ecef; background: #fafafa; position: relative; overflow: hidden;">
+            <div style="border: 1px solid var(--border-color); background: var(--bg-card); position: relative; overflow: hidden;">
+                
                 <!-- Resource Image -->
                 <div style="height: 150px; background: #e9ecef; overflow: hidden; position: relative;">
-                    {% if resource.image %}
+                    <!-- Priority: room_photo for meeting rooms, then image, then image_url, then default -->
+                    {% if resource.is_meeting_room and resource.room_photo %}
+                        <img src="{{ resource.room_photo.url }}" alt="{{ resource.name }}" 
+                             style="width: 100%; height: 100%; object-fit: cover;">
+                    {% elif resource.image %}
                         <img src="{{ resource.image.url }}" alt="{{ resource.name }}" 
                              style="width: 100%; height: 100%; object-fit: cover;">
                     {% elif resource.image_url %}
@@ -51,9 +56,16 @@
                         <img src="/static/bookings/images/default-resource.png" alt="No image available" 
                              style="width: 100%; height: 100%; object-fit: cover;">
                     {% endif %}
-            
+                    
+                    <!-- Meeting Room Badge -->
+                    {% if resource.is_meeting_room %}
+                        <div style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white; padding: 2px 10px; font-size: 0.6rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                            Meeting Room
+                        </div>
+                    {% endif %}
+                    
                     <!-- Status Badge on Image -->
-                    <div style="position: absolute; top: 10px; right: 10px;">
+                    <div style="position: absolute; top: 8px; right: 8px;">
                         {% if resource.status == 'APPROVED' %}
                             <span style="background: rgba(40, 167, 69, 0.9); color: white; padding: 2px 10px; font-size: 0.65rem; font-weight: 600;">Approved</span>
                         {% elif resource.status == 'PENDING' %}
@@ -68,13 +80,49 @@
                 
                 <!-- Resource Content -->
                 <div style="padding: 15px 18px 18px 18px;">
-                    <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 5px 0; color: #1a1a2e;">{{ resource.name }}</h3>
-                    <p style="font-size: 0.8rem; color: #6c757d; margin: 0 0 10px 0; line-height: 1.4;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 5px 0; color: var(--text-primary);">{{ resource.name }}</h3>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.4;">
                         {{ resource.description|truncatewords:20 }}
                     </p>
                     
+                    <!-- Meeting Room Quick Info -->
+                    {% if resource.is_meeting_room %}
+                        <div style="margin: 0 0 8px 0; display: flex; flex-wrap: wrap; gap: 4px;">
+                            {% if resource.meeting_room.seating_capacity %}
+                                <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                    {{ resource.meeting_room.seating_capacity }}
+                                </span>
+                            {% endif %}
+                            {% if resource.meeting_room.room_number %}
+                                <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                    {{ resource.meeting_room.room_number }}
+                                </span>
+                            {% endif %}
+                            {% if resource.meeting_room.floor_number %}
+                                <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                    Floor {{ resource.meeting_room.floor_number }}
+                                </span>
+                            {% endif %}
+                            {% if resource.meeting_room.has_projector %}
+                                <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                    Projector
+                                </span>
+                            {% endif %}
+                            {% if resource.meeting_room.has_video_conferencing %}
+                                <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                    VC
+                                </span>
+                            {% endif %}
+                            {% if resource.meeting_room.has_wifi %}
+                                <span style="background: var(--bg-hover); padding: 1px 8px; font-size: 0.6rem; color: var(--text-secondary);">
+                                    Wifi
+                                </span>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    
                     <!-- Status Message -->
-                    <div style="margin: 8px 0; padding: 8px 10px; background: #f8f9fa; font-size: 0.7rem; border-left: 3px solid 
+                    <div style="margin: 8px 0; padding: 8px 10px; background: var(--bg-hover); font-size: 0.7rem; border-left: 3px solid 
                         {% if resource.status == 'APPROVED' %}#28a745
                         {% elif resource.status == 'PENDING' %}#ffc107
                         {% elif resource.status == 'REJECTED' %}#dc3545
@@ -90,17 +138,30 @@
                         {% endif %}
                     </div>
                     
-                    {% if resource.location %}
-                        <p style="font-size: 0.75rem; color: #6c757d; margin: 0 0 5px 0;">📍 {{ resource.location }}</p>
-                    {% endif %}
-                    {% if resource.price_per_hour %}
-                        <p style="font-size: 0.85rem; font-weight: 600; color: #28a745; margin: 0 0 5px 0;">
-                            ${{ resource.price_per_hour }}/hour
-                        </p>
-                    {% endif %}
-                    <p style="font-size: 0.7rem; color: #999; margin: 0 0 12px 0;">
-                        Created: {{ resource.created_at|date:"M d, Y" }}
-                    </p>
+                    <!-- Resource Details -->
+                    <div style="margin: 8px 0;">
+                        {% if resource.location %}
+                            <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 0 0 5px 0;">📍 {{ resource.location }}</p>
+                        {% endif %}
+                        {% if resource.price_per_hour %}
+                            <p style="font-size: 0.85rem; font-weight: 600; color: #28a745; margin: 0 0 5px 0;">
+                                ${{ resource.price_per_hour }}/hour
+                            </p>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Created By and Created At -->
+                    <div style="font-size: 0.7rem; color: var(--text-secondary); margin: 8px 0 12px 0; padding: 8px 10px; background: var(--bg-hover); border-top: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px;">
+                            <span><strong>Created by:</strong> {{ resource.owner.username }}</span>
+                            <span><strong>Created:</strong> {{ resource.created_at|date:"M d, Y" }}</span>
+                        </div>
+                        {% if resource.updated_at != resource.created_at %}
+                            <div style="margin-top: 3px; font-size: 0.65rem; color: var(--text-secondary); opacity: 0.7;">
+                                Last updated: {{ resource.updated_at|date:"M d, Y" }}
+                            </div>
+                        {% endif %}
+                    </div>
                     
                     <!-- Actions -->
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -131,15 +192,15 @@
         {% endfor %}
     </div>
 {% else %}
-    <div style="text-align: center; padding: 60px 20px; background: #f8f9fa; margin-top: 20px;">
+    <div style="text-align: center; padding: 60px 20px; background: var(--bg-hover); margin-top: 20px; border: 1px solid var(--border-color);">
         <div style="font-size: 48px; margin-bottom: 15px;">📭</div>
-        <h3 style="font-size: 1.2rem; color: #333; margin-bottom: 10px;">No resources created yet</h3>
-        <p style="font-size: 0.85rem; color: #6c757d; margin-bottom: 20px;">Start by creating your first resource!</p>
+        <h3 style="font-size: 1.2rem; color: var(--text-primary); margin-bottom: 10px;">No resources created yet</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">Start by creating your first resource!</p>
         <a href="{% url 'create_resource' %}" 
            style="background: #28a745; color: white; padding: 10px 25px; text-decoration: none; font-size: 0.85rem; font-weight: 600; display: inline-block;"
            onmouseover="this.style.background='#218838'"
            onmouseout="this.style.background='#28a745'">
-            Create Resource
+            ➕ Create Resource
         </a>
     </div>
 {% endif %}
@@ -151,6 +212,14 @@
         }
         .stat-cards {
             grid-template-columns: 1fr 1fr !important;
+        }
+        div[style*="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))"] {
+            grid-template-columns: 1fr !important;
+        }
+        .created-info {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 3px !important;
         }
     }
 </style>

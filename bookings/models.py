@@ -41,6 +41,124 @@ class Category(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
+class Amenity(models.Model):
+    """Amenities available for meeting rooms"""
+    name = models.CharField(max_length=100)
+    icon = models.CharField(max_length=50, blank=True, null=True, help_text="Font Awesome icon class")
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name_plural = "Amenities"
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+
+class MeetingRoom(models.Model):
+    """Extended meeting room features"""
+    resource = models.OneToOneField(
+        'Resource', 
+        on_delete=models.CASCADE, 
+        related_name='meeting_room'
+    )
+    
+    # Room identification
+    room_number = models.CharField(max_length=20, blank=True, null=True)
+    floor_number = models.IntegerField(default=1)
+    building_name = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Capacity tracking
+    seating_capacity = models.IntegerField(default=0, help_text="Seating capacity")
+    standing_capacity = models.IntegerField(default=0, help_text="Standing capacity")
+    classroom_capacity = models.IntegerField(default=0, help_text="Classroom setup capacity")
+    theater_capacity = models.IntegerField(default=0, help_text="Theater setup capacity")
+    
+    # Room features (booleans)
+    has_projector = models.BooleanField(default=False)
+    has_whiteboard = models.BooleanField(default=False)
+    has_video_conferencing = models.BooleanField(default=False)
+    has_phone = models.BooleanField(default=False)
+    has_smart_tv = models.BooleanField(default=False)
+    has_audio_system = models.BooleanField(default=False)
+    has_wifi = models.BooleanField(default=True)
+    has_air_conditioning = models.BooleanField(default=True)
+    is_accessible = models.BooleanField(default=True, help_text="Wheelchair accessible")
+    
+    # Amenities (Many-to-Many)
+    amenities = models.ManyToManyField(Amenity, blank=True, related_name='meeting_rooms')
+    
+    # Room specifications
+    room_size_sqft = models.IntegerField(null=True, blank=True, help_text="Room size in square feet")
+    natural_light = models.BooleanField(default=False)
+    has_window = models.BooleanField(default=True)
+    
+    # Setup time
+    default_setup_time = models.IntegerField(default=15, help_text="Default setup time in minutes")
+    default_teardown_time = models.IntegerField(default=15, help_text="Default teardown time in minutes")
+    
+    # Documents
+    floor_plan = models.ImageField(upload_to='floor_plans/', blank=True, null=True)
+    room_photo = models.ImageField(upload_to='room_photos/', blank=True, null=True)
+    
+    # Additional info
+    notes = models.TextField(blank=True, help_text="Any additional notes about the room")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.resource.name} (Room {self.room_number or 'N/A'})"
+    
+    def get_capacity_display(self):
+        """Get a formatted string of all capacities"""
+        capacities = []
+        if self.seating_capacity:
+            capacities.append(f"Seating: {self.seating_capacity}")
+        if self.standing_capacity:
+            capacities.append(f"Standing: {self.standing_capacity}")
+        if self.classroom_capacity:
+            capacities.append(f"Classroom: {self.classroom_capacity}")
+        if self.theater_capacity:
+            capacities.append(f"Theater: {self.theater_capacity}")
+        return " | ".join(capacities) if capacities else "No capacity data"
+    
+    def get_amenities_list(self):
+        """Get list of amenity names"""
+        return [amenity.name for amenity in self.amenities.all()]
+    
+    def get_features_list(self):
+        """Get list of available features"""
+        features = []
+        if self.has_projector:
+            features.append('Projector')
+        if self.has_whiteboard:
+            features.append('Whiteboard')
+        if self.has_video_conferencing:
+            features.append('Video Conferencing')
+        if self.has_phone:
+            features.append('Phone')
+        if self.has_smart_tv:
+            features.append('Smart TV')
+        if self.has_audio_system:
+            features.append('Audio System')
+        if self.has_wifi:
+            features.append('WiFi')
+        if self.has_air_conditioning:
+            features.append('Air Conditioning')
+        return features
+    
+    def get_max_capacity(self):
+        """Get the maximum capacity across all types"""
+        return max(
+            self.seating_capacity or 0,
+            self.standing_capacity or 0,
+            self.classroom_capacity or 0,
+            self.theater_capacity or 0
+        )
+
+
 class Resource(models.Model):
     """A bookable resource (e.g., a tutor, a room, equipment)"""
     
@@ -78,6 +196,7 @@ class Resource(models.Model):
         help_text="Select a category for this resource"
     )
     
+    # ADD THIS IMAGE FIELD
     image = models.ImageField(
         upload_to='resources/', 
         blank=True, 
@@ -86,7 +205,22 @@ class Resource(models.Model):
         help_text="Upload an image of your resource (max 5MB)"
     )
     
+    # Keep image_url for backward compatibility
     image_url = models.URLField(blank=True, null=True, help_text="Optional: Link to an image URL")
+    
+    # Meeting room specific images (these can be separate or use the main image)
+    room_photo = models.ImageField(
+        upload_to='room_photos/', 
+        blank=True, 
+        null=True,
+        help_text="Upload a photo of the room"
+    )
+    floor_plan = models.ImageField(
+        upload_to='floor_plans/', 
+        blank=True, 
+        null=True,
+        help_text="Upload a floor plan of the room"
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -125,6 +259,17 @@ class Resource(models.Model):
                 'booking_fee': self.category.booking_fee,
             }
         return {}
+    
+    def is_meeting_room(self):
+        """Check if this resource has meeting room features"""
+        return hasattr(self, 'meeting_room')
+    
+    def get_meeting_room(self):
+        """Get the meeting room instance if it exists"""
+        if self.is_meeting_room():
+            return self.meeting_room
+        return None
+
 
 class Booking(models.Model):
     """A booking for a specific resource at a specific time"""

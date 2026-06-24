@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.core.exceptions import ValidationError
 from .models import Resource, Category, UserProfile
+from .models import MeetingRoom, Amenity
 import os
 
 class SignUpForm(UserCreationForm):
@@ -59,8 +60,9 @@ class ResourceForm(forms.ModelForm):
         model = Resource
         fields = [
             'name', 'description', 'category', 'location', 
-            'max_capacity', 'price_per_hour', 'image', 'image_url',
-            # We'll save extra fields to a JSON field or separate model later
+            'max_capacity', 'price_per_hour', 
+            'image', 'image_url',           # Main resource images
+            'room_photo', 'floor_plan',     # Meeting room specific images
         ]
         widgets = {
             'name': forms.TextInput(attrs={
@@ -95,8 +97,20 @@ class ResourceForm(forms.ModelForm):
                 'placeholder': '0.00',
                 'class': 'form-control'
             }),
+            'image': forms.FileInput(attrs={
+                'accept': 'image/*',
+                'class': 'form-control'
+            }),
             'image_url': forms.URLInput(attrs={
                 'placeholder': 'https://example.com/image.jpg',
+                'class': 'form-control'
+            }),
+            'room_photo': forms.FileInput(attrs={
+                'accept': 'image/*',
+                'class': 'form-control'
+            }),
+            'floor_plan': forms.FileInput(attrs={
+                'accept': 'image/*',
                 'class': 'form-control'
             }),
         }
@@ -105,7 +119,8 @@ class ResourceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         # Make fields optional
-        optional_fields = ['category', 'location', 'max_capacity', 'price_per_hour', 'image', 'image_url', 
+        optional_fields = ['category', 'location', 'max_capacity', 'price_per_hour', 
+                          'image', 'image_url', 'room_photo', 'floor_plan',
                           'contact_email', 'contact_phone', 'website', 'tags']
         for field_name in optional_fields:
             if field_name in self.fields:
@@ -125,6 +140,10 @@ class ResourceForm(forms.ModelForm):
         self.fields['description'].help_text = 'Maximum 1000 characters. Be specific about what you offer.'
         self.fields['max_capacity'].help_text = 'How many people can use this resource at once?'
         self.fields['price_per_hour'].help_text = 'Set to 0.00 for free resources'
+        self.fields['image'].help_text = 'Upload a main image for your resource (max 5MB)'
+        self.fields['image_url'].help_text = 'Optional: Link to an external image URL'
+        self.fields['room_photo'].help_text = 'Upload a photo of the meeting room (max 5MB)'
+        self.fields['floor_plan'].help_text = 'Upload a floor plan of the meeting room (max 5MB)'
         
         # Add CSS classes for styling
         for field_name, field in self.fields.items():
@@ -180,7 +199,7 @@ class ResourceForm(forms.ModelForm):
         return phone
     
     def clean_image(self):
-        """Validate image file"""
+        """Validate main image file"""
         image = self.cleaned_data.get('image')
         if image:
             # Check file size (max 5MB)
@@ -193,6 +212,36 @@ class ResourceForm(forms.ModelForm):
             if ext not in valid_extensions:
                 raise ValidationError(f"Unsupported file extension. Please use: {', '.join(valid_extensions)}")
         return image
+    
+    def clean_room_photo(self):
+        """Validate room photo file"""
+        room_photo = self.cleaned_data.get('room_photo')
+        if room_photo:
+            # Check file size (max 5MB)
+            if room_photo.size > 5 * 1024 * 1024:
+                raise ValidationError('Room photo file size cannot exceed 5MB.')
+            
+            # Check file extension
+            valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+            ext = os.path.splitext(room_photo.name)[1].lower()
+            if ext not in valid_extensions:
+                raise ValidationError(f"Unsupported file extension. Please use: {', '.join(valid_extensions)}")
+        return room_photo
+    
+    def clean_floor_plan(self):
+        """Validate floor plan file"""
+        floor_plan = self.cleaned_data.get('floor_plan')
+        if floor_plan:
+            # Check file size (max 5MB)
+            if floor_plan.size > 5 * 1024 * 1024:
+                raise ValidationError('Floor plan file size cannot exceed 5MB.')
+            
+            # Check file extension
+            valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+            ext = os.path.splitext(floor_plan.name)[1].lower()
+            if ext not in valid_extensions:
+                raise ValidationError(f"Unsupported file extension. Please use: {', '.join(valid_extensions)}")
+        return floor_plan
 
 class ResourceStatusForm(forms.ModelForm):
     """Form for admins to update resource status"""
@@ -317,3 +366,45 @@ class UserSettingsForm(forms.ModelForm):
         if email and User.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
             raise ValidationError('This email is already in use by another account.')
         return email
+
+class MeetingRoomForm(forms.ModelForm):
+    """Form for meeting room specific features"""
+    
+    class Meta:
+        model = MeetingRoom
+        fields = [
+            'room_number', 'floor_number', 'building_name',
+            'seating_capacity', 'standing_capacity', 'classroom_capacity', 'theater_capacity',
+            'has_projector', 'has_whiteboard', 'has_video_conferencing', 'has_phone',
+            'has_smart_tv', 'has_audio_system', 'has_wifi', 'has_air_conditioning',
+            'is_accessible', 'amenities', 'room_size_sqft', 'natural_light', 'has_window',
+            'default_setup_time', 'default_teardown_time',
+            'floor_plan', 'room_photo',  # Make sure these are included
+            'notes'
+        ]
+        widgets = {
+            'room_number': forms.TextInput(attrs={'placeholder': 'e.g., 101'}),
+            'floor_number': forms.NumberInput(attrs={'min': 0, 'placeholder': '1'}),
+            'building_name': forms.TextInput(attrs={'placeholder': 'e.g., Main Building'}),
+            'seating_capacity': forms.NumberInput(attrs={'min': 0, 'placeholder': '0'}),
+            'standing_capacity': forms.NumberInput(attrs={'min': 0, 'placeholder': '0'}),
+            'classroom_capacity': forms.NumberInput(attrs={'min': 0, 'placeholder': '0'}),
+            'theater_capacity': forms.NumberInput(attrs={'min': 0, 'placeholder': '0'}),
+            'default_setup_time': forms.NumberInput(attrs={'min': 0, 'placeholder': '15'}),
+            'default_teardown_time': forms.NumberInput(attrs={'min': 0, 'placeholder': '15'}),
+            'room_size_sqft': forms.NumberInput(attrs={'min': 0, 'placeholder': '0'}),
+            'notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Any additional notes...'}),
+            'amenities': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'room_photo': forms.FileInput(attrs={'accept': 'image/*', 'class': 'form-control'}),
+            'floor_plan': forms.FileInput(attrs={'accept': 'image/*', 'class': 'form-control'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if field_name not in ['amenities']:
+                field.required = False
+            if field_name == 'room_photo':
+                field.help_text = "Upload a photo of the room (JPG, PNG, GIF). Max 5MB."
+            if field_name == 'floor_plan':
+                field.help_text = "Upload a floor plan (JPG, PNG, GIF). Max 5MB."

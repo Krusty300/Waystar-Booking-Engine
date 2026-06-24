@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Resource, Booking
+from .models import MeetingRoom, Amenity
 
 @admin.register(Resource)
 class ResourceAdmin(admin.ModelAdmin):
@@ -19,3 +20,16 @@ class BookingAdmin(admin.ModelAdmin):
             return obj.notes[:50] + ('...' if len(obj.notes) > 50 else '')
         return '-'
     notes_preview.short_description = 'Notes Preview'
+
+@admin.register(MeetingRoom)
+class MeetingRoomAdmin(admin.ModelAdmin):
+    list_display = ['resource', 'room_number', 'floor_number', 'seating_capacity', 'has_projector', 'has_video_conferencing']
+    list_filter = ['floor_number', 'has_projector', 'has_video_conferencing', 'has_wifi']
+    search_fields = ['resource__name', 'room_number', 'building_name']
+    filter_horizontal = ['amenities']
+    readonly_fields = ['created_at', 'updated_at']
+
+@admin.register(Amenity)
+class AmenityAdmin(admin.ModelAdmin):
+    list_display = ['name', 'icon', 'is_active']
+    search_fields = ['name']
