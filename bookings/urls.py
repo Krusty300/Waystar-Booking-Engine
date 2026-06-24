@@ -23,7 +23,7 @@ urlpatterns = [
     
     # Admin resource management
     path('manage-resources/', views.admin_manage_resources, name='admin_manage_resources'),
-    path('manage-resource/<int:resource_id>/status/', views.admin_update_resource_status, name='admin_update_resource_status'),
+    path('manage-resource/<int:resource_id>/status/', views.admin_update_resource_status,     name='admin_update_resource_status'),
     path('analytics/', views.admin_dashboard, name='admin_dashboard'),
     
     # Booking management
@@ -43,4 +43,20 @@ urlpatterns = [
     path('category/create/', views.create_category, name='create_category'),
     path('category/<int:category_id>/edit/', views.edit_category, name='edit_category'),
     path('category/<int:category_id>/delete/', views.delete_category, name='delete_category'),
+
+
+    # Review URLs
+    path('resource/<int:resource_id>/write-review/', views.write_review, name='write_review'),
+    path('review/<int:review_id>/edit/', views.edit_review, name='edit_review'),
+    path('review/<int:review_id>/delete/', views.delete_review, name='delete_review'),
+    path('my-reviews/', views.my_reviews, name='my_reviews'),
+    path('my-review-history/', views.my_review_history, name='my_review_history'),
+    path('resource/<int:resource_id>/reviews/', views.resource_reviews, name='resource_reviews'),
+    path('api/review/<int:review_id>/helpful/', views.toggle_review_helpful, name='toggle_review_helpful'),
+
+    # Admin Review URLs - Changed from 'admin/reviews/' to 'reviews-admin/'
+    path('reviews-admin/', views.admin_reviews, name='admin_reviews'),
+    path('reviews-admin/<int:review_id>/', views.admin_review_detail, name='admin_review_detail'),
+    path('reviews-admin/bulk-action/', views.admin_bulk_action_reviews, name='admin_bulk_action_reviews'),
+   
 ]

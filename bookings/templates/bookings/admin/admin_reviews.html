@@ -1,0 +1,201 @@
+{% extends 'bookings/base.html' %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+    <h1 style="font-size: 1.6rem; font-weight: 800; margin: 0;">Review Moderation</h1>
+    <span style="font-size: 0.85rem; color: var(--text-secondary);">Manage user reviews</span>
+</div>
+
+<!-- Statistics Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #007bff;">
+        <div style="font-size: 1.3rem; font-weight: 700; color: #007bff;">{{ total }}</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Total</div>
+    </div>
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #ffc107; cursor: pointer;" onclick="location.href='?status=PENDING'">
+        <div style="font-size: 1.3rem; font-weight: 700; color: #ffc107;">{{ pending }}</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Pending</div>
+    </div>
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #28a745; cursor: pointer;" onclick="location.href='?status=APPROVED'">
+        <div style="font-size: 1.3rem; font-weight: 700; color: #28a745;">{{ approved }}</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Approved</div>
+    </div>
+    <div style="background: var(--bg-card); padding: 12px; text-align: center; border-left: 4px solid #dc3545; cursor: pointer;" onclick="location.href='?status=REJECTED'">
+        <div style="font-size: 1.3rem; font-weight: 700; color: #dc3545;">{{ rejected }}</div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Rejected</div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div style="margin: 15px 0 20px 0; padding: 15px; background: var(--bg-card);">
+    <form method="get" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.75rem; font-weight: 600;">Status:</span>
+            <select name="status" style="padding: 4px 8px; border: 2px solid var(--input-border); font-size: 0.75rem; background: var(--bg-input); color: var(--text-primary);">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.75rem; font-weight: 600;">Rating:</span>
+            <select name="rating" style="padding: 4px 8px; border: 2px solid var(--input-border); font-size: 0.75rem; background: var(--bg-input); color: var(--text-primary);">
+                <option value="all" {% if rating_filter == 'all' %}selected{% endif %}>All</option>
+                {% for value, label in rating_choices %}
+                    <option value="{{ value }}" {% if rating_filter == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1;">
+            <span style="font-size: 0.75rem; font-weight: 600;">Search:</span>
+            <input type="text" name="search" placeholder="Search reviews..." value="{{ search_query }}" style="flex: 1; min-width: 150px; padding: 4px 8px; border: 2px solid var(--input-border); font-size: 0.75rem; background: var(--bg-input); color: var(--text-primary);">
+        </div>
+        
+        <button type="submit" style="padding: 4px 16px; background: #007bff; color: white; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer;">
+            Filter
+        </button>
+        <a href="?" style="padding: 4px 16px; background: #6c757d; color: white; text-decoration: none; font-size: 0.75rem; font-weight: 600;">
+            Clear
+        </a>
+    </form>
+</div>
+
+<!-- Bulk Actions -->
+{% if reviews %}
+<form method="post" action="{% url 'admin_bulk_action_reviews' %}" id="bulk-action-form">
+    {% csrf_token %}
+    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+        <span style="font-size: 0.75rem; font-weight: 600;">Bulk Actions:</span>
+        <select name="action" style="padding: 4px 8px; border: 2px solid var(--input-border); font-size: 0.75rem; background: var(--bg-input); color: var(--text-primary);">
+            <option value="">Select action...</option>
+            <option value="approve">Approve Selected</option>
+            <option value="reject">Reject Selected</option>
+            <option value="delete">Delete Selected</option>
+        </select>
+        <button type="submit" style="padding: 4px 16px; background: #007bff; color: white; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer;">
+            Apply
+        </button>
+        <span style="font-size: 0.7rem; color: var(--text-secondary);">{{ reviews|length }} reviews</span>
+    </div>
+
+    <!-- Reviews Table -->
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 8px 10px; text-align: center; width: 30px;">
+                        <input type="checkbox" id="select-all" onchange="toggleAll(this)">
+                    </th>
+                    <th style="padding: 8px 10px; text-align: left;">Resource</th>
+                    <th style="padding: 8px 10px; text-align: left;">User</th>
+                    <th style="padding: 8px 10px; text-align: center;">Rating</th>
+                    <th style="padding: 8px 10px; text-align: left;">Review</th>
+                    <th style="padding: 8px 10px; text-align: center;">Status</th>
+                    <th style="padding: 8px 10px; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for review in reviews %}
+                    <tr style="border-bottom: 1px solid #dee2e6; 
+                               {% if review.status == 'PENDING' %}background: #fff8e1;{% endif %}
+                               {% if review.status == 'REJECTED' %}background: #fce4ec;{% endif %}">
+                        <td style="padding: 8px 10px; text-align: center;">
+                            <input type="checkbox" name="review_ids" value="{{ review.id }}" class="review-checkbox">
+                        </td>
+                        <td style="padding: 8px 10px;">
+                            <strong>{{ review.resource.name }}</strong>
+                        </td>
+                        <td style="padding: 8px 10px;">
+                            {{ review.user.username }}
+                            <span style="display: block; font-size: 0.65rem; color: var(--text-secondary);">{{ review.user.email }}</span>
+                        </td>
+                        <td style="padding: 8px 10px; text-align: center; font-size: 0.9rem;">
+                            {{ review.rating }}
+                        </td>
+                        <td style="padding: 8px 10px;">
+                            {% if review.title %}
+                                <strong>{{ review.title|truncatewords:5 }}</strong>
+                            {% endif %}
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ review.comment|truncatewords:10 }}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 2px;">
+                                {{ review.created_at|date:"M d, Y" }}
+                                {% if review.is_verified %}
+                                    <span style="background: #28a745; color: white; padding: 1px 6px; font-size: 0.55rem;">Verified</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td style="padding: 8px 10px; text-align: center;">
+                            {% if review.status == 'APPROVED' %}
+                                <span style="background: #d4edda; color: #155724; padding: 2px 10px; font-size: 0.65rem; font-weight: 600;">Approved</span>
+                            {% elif review.status == 'PENDING' %}
+                                <span style="background: #fff3cd; color: #856404; padding: 2px 10px; font-size: 0.65rem; font-weight: 600;">Pending</span>
+                            {% else %}
+                                <span style="background: #f8d7da; color: #721c24; padding: 2px 10px; font-size: 0.65rem; font-weight: 600;">Rejected</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 10px; text-align: center;">
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;">
+                                <a href="{% url 'admin_review_detail' review.id %}" style="font-size: 0.7rem; color: #007bff; text-decoration: none;">View</a>
+                                <a href="{% url 'resource_detail' review.resource.id %}" style="font-size: 0.7rem; color: #28a745; text-decoration: none;">Resource</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+<!-- Pagination -->
+{% if reviews.paginator.num_pages > 1 %}
+    <div style="display: flex; justify-content: center; gap: 5px; margin-top: 20px; flex-wrap: wrap;">
+        {% if reviews.has_previous %}
+            <a href="?page=1&status={{ status_filter }}&rating={{ rating_filter }}&search={{ search_query }}" style="padding: 4px 12px; background: #e9ecef; color: #333; text-decoration: none; font-size: 0.75rem;">⏮ First</a>
+            <a href="?page={{ reviews.previous_page_number }}&status={{ status_filter }}&rating={{ rating_filter }}&search={{ search_query }}" style="padding: 4px 12px; background: #e9ecef; color: #333; text-decoration: none; font-size: 0.75rem;">◀ Prev</a>
+        {% endif %}
+        
+        {% for num in reviews.paginator.page_range %}
+            {% if reviews.number == num %}
+                <span style="padding: 4px 12px; background: #007bff; color: white; font-size: 0.75rem;">{{ num }}</span>
+            {% elif num > reviews.number|add:'-3' and num < reviews.number|add:'3' %}
+                <a href="?page={{ num }}&status={{ status_filter }}&rating={{ rating_filter }}&search={{ search_query }}" style="padding: 4px 12px; background: #e9ecef; color: #333; text-decoration: none; font-size: 0.75rem;">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+        
+        {% if reviews.has_next %}
+            <a href="?page={{ reviews.next_page_number }}&status={{ status_filter }}&rating={{ rating_filter }}&search={{ search_query }}" style="padding: 4px 12px; background: #e9ecef; color: #333; text-decoration: none; font-size: 0.75rem;">Next ▶</a>
+            <a href="?page={{ reviews.paginator.num_pages }}&status={{ status_filter }}&rating={{ rating_filter }}&search={{ search_query }}" style="padding: 4px 12px; background: #e9ecef; color: #333; text-decoration: none; font-size: 0.75rem;">Last ⏭</a>
+        {% endif %}
+    </div>
+{% endif %}
+
+{% else %}
+    <div style="text-align: center; padding: 60px 20px; background: var(--bg-hover); border: 1px solid var(--border-color);">
+        <div style="font-size: 48px; margin-bottom: 15px;">📭</div>
+        <h3 style="font-size: 1.2rem; color: var(--text-primary); margin-bottom: 10px;">No reviews found</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary);">No reviews match your filters.</p>
+    </div>
+{% endif %}
+
+<script>
+function toggleAll(masterCheckbox) {
+    const checkboxes = document.querySelectorAll('.review-checkbox');
+    checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+}
+</script>
+
+<style>
+    @media (max-width: 768px) {
+        table {
+            font-size: 0.7rem !important;
+        }
+        th, td {
+            padding: 4px 6px !important;
+        }
+    }
+</style>
+
+{% endblock %}

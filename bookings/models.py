@@ -270,6 +270,32 @@ class Resource(models.Model):
             return self.meeting_room
         return None
 
+    def get_average_rating(self):
+        """Get average rating for the resource"""
+        approved_reviews = self.reviews.filter(status='APPROVED')
+        if approved_reviews.exists():
+            total = approved_reviews.aggregate(models.Avg('rating'))['rating__avg']
+            return round(total, 1)
+        return 0
+
+    def get_rating_count(self):
+        """Get total number of ratings"""
+        return self.reviews.filter(status='APPROVED').count()
+
+    def get_rating_distribution(self):
+        """Get distribution of ratings"""
+        distribution = {}
+        for i in range(1, 6):
+            distribution[i] = self.reviews.filter(
+                status='APPROVED', 
+                rating=i
+            ).count()
+        return distribution
+
+    def get_recent_reviews(self, limit=5):
+        """Get recent approved reviews"""
+        return self.reviews.filter(status='APPROVED')[:limit]
+
 
 class Booking(models.Model):
     """A booking for a specific resource at a specific time"""
@@ -320,10 +346,10 @@ class Booking(models.Model):
     def get_status_icon(self):
         """Get status icon for display"""
         icons = {
-            'PENDING': 'Pending',
-            'CONFIRMED': 'Confirmed',
-            'CANCELLED': 'Cancelled',
-            'COMPLETED': 'Completed',
+            'PENDING': '⏳',
+            'CONFIRMED': '✅',
+            'CANCELLED': '❌',
+            'COMPLETED': '📌',
         }
         return icons.get(self.status, '📋')
     
@@ -352,6 +378,127 @@ class Booking(models.Model):
     def is_past(self):
         """Check if booking is past"""
         return self.start_time <= timezone.now() and self.status != 'CANCELLED'
+
+class Review(models.Model):
+    """Review and rating for resources"""
+    
+    RATING_CHOICES = [
+        (1, '⭐ 1 - Poor'),
+        (2, '⭐⭐ 2 - Fair'),
+        (3, '⭐⭐⭐ 3 - Good'),
+        (4, '⭐⭐⭐⭐ 4 - Very Good'),
+        (5, '⭐⭐⭐⭐⭐ 5 - Excellent'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending Approval'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+    ]
+    
+    resource = models.ForeignKey(
+        Resource, 
+        on_delete=models.CASCADE, 
+        related_name='reviews'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='reviews'
+    )
+    booking = models.OneToOneField(
+        Booking, 
+        on_delete=models.CASCADE, 
+        related_name='review',
+        null=True, 
+        blank=True,
+        help_text="The booking this review is for"
+    )
+    
+    # Rating and review
+    rating = models.IntegerField(choices=RATING_CHOICES)
+    title = models.CharField(max_length=200, blank=True, null=True)
+    comment = models.TextField(max_length=1000, blank=True, null=True)
+    
+    # Review metadata
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    is_verified = models.BooleanField(
+        default=False, 
+        help_text="Verified purchase - user actually booked this resource"
+    )
+    
+    # Moderation fields (NEW)
+    moderated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='moderated_reviews',
+        help_text="Admin who moderated this review"
+    )
+    moderation_reason = models.TextField(
+        blank=True, 
+        null=True,
+        help_text="Reason for rejection (visible to user)"
+    )
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    
+    # Helpful votes
+    helpful_count = models.IntegerField(default=0)
+    helpful_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, 
+        related_name='helpful_reviews',
+        blank=True
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['user', 'resource']
+        indexes = [
+            models.Index(fields=['resource', 'rating']),
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['moderated_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.resource.name} - {self.rating}⭐"
+    
+    def get_rating_stars(self):
+        return '⭐' * self.rating + '☆' * (5 - self.rating)
+    
+    def get_rating_percentage(self):
+        return (self.rating / 5) * 100
+    
+    def is_helpful(self, user):
+        return self.helpful_users.filter(id=user.id).exists() if user.is_authenticated else False
+    
+    def toggle_helpful(self, user):
+        if user.is_authenticated:
+            if self.is_helpful(user):
+                self.helpful_users.remove(user)
+                self.helpful_count -= 1
+            else:
+                self.helpful_users.add(user)
+                self.helpful_count += 1
+            self.save()
+            return True
+        return False
+    
+    def moderate(self, status, admin_user, reason=None):
+        """Moderate a review"""
+        self.status = status
+        self.moderated_by = admin_user
+        self.moderated_at = timezone.now()
+        if reason:
+            self.moderation_reason = reason
+        self.save()
+        return self
+
 
 class UserProfile(models.Model):
     """Extended user profile information"""

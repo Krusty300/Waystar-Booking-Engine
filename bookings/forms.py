@@ -4,6 +4,7 @@ from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.core.exceptions import ValidationError
 from .models import Resource, Category, UserProfile
 from .models import MeetingRoom, Amenity
+from .models import Review
 import os
 
 class SignUpForm(UserCreationForm):
@@ -408,3 +409,55 @@ class MeetingRoomForm(forms.ModelForm):
                 field.help_text = "Upload a photo of the room (JPG, PNG, GIF). Max 5MB."
             if field_name == 'floor_plan':
                 field.help_text = "Upload a floor plan (JPG, PNG, GIF). Max 5MB."
+
+class ReviewForm(forms.ModelForm):
+    """Form for submitting a review"""
+    
+    class Meta:
+        model = Review
+        fields = ['rating', 'title', 'comment']
+        widgets = {
+            'rating': forms.RadioSelect(choices=Review.RATING_CHOICES),
+            'title': forms.TextInput(attrs={
+                'placeholder': 'Summarize your experience...',
+                'class': 'form-control',
+                'maxlength': 200
+            }),
+            'comment': forms.Textarea(attrs={
+                'rows': 5,
+                'placeholder': 'Share your detailed experience...',
+                'class': 'form-control',
+                'maxlength': 1000
+            }),
+        }
+        labels = {
+            'rating': 'Your Rating',
+            'title': 'Review Title',
+            'comment': 'Your Review',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['rating'].required = True
+        self.fields['title'].required = False
+        self.fields['comment'].required = True
+        
+        # Style the radio buttons
+        self.fields['rating'].widget.attrs.update({'class': 'rating-input'})
+
+class ReviewFilterForm(forms.Form):
+    """Form for filtering reviews"""
+    rating = forms.ChoiceField(
+        choices=[('', 'All Ratings')] + [(i, f'{i} ⭐') for i in range(1, 6)],
+        required=False
+    )
+    sort = forms.ChoiceField(
+        choices=[
+            ('newest', 'Newest First'),
+            ('oldest', 'Oldest First'),
+            ('highest', 'Highest Rating'),
+            ('lowest', 'Lowest Rating'),
+            ('helpful', 'Most Helpful'),
+        ],
+        required=False
+    )

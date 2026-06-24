@@ -19,10 +19,13 @@ from calendar import monthcalendar, month_name
 from datetime import datetime, timedelta
 from django.db.models import Q
 from django.core.paginator import Paginator
-import calendar
+from .email_service import send_review_submitted_email, send_review_approved_email, send_review_rejected_email
+from .forms import ReviewForm, ReviewFilterForm
+from .models import Review
 from django.contrib.auth import logout
 from django.contrib import messages
 from django.shortcuts import redirect
+import calendar
 import json
 
 # Import analytics service after all other imports
@@ -1119,3 +1122,326 @@ def custom_logout(request):
     logout(request)
     messages.success(request, 'You have been successfully logged out.')
     return redirect('/')
+
+@login_required
+def write_review(request, resource_id):
+    """View for writing a review"""
+    resource = get_object_or_404(Resource, id=resource_id)
+    
+    # Check if user has already reviewed this resource
+    existing_review = Review.objects.filter(user=request.user, resource=resource).first()
+    if existing_review:
+        messages.warning(request, 'You have already reviewed this resource.')
+        return redirect('edit_review', review_id=existing_review.id)
+    
+    # Check if user has booked this resource
+    has_booked = Booking.objects.filter(
+        customer=request.user,
+        resource=resource,
+        status='CONFIRMED'
+    ).exists()
+    
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.user = request.user
+            review.resource = resource
+            review.is_verified = has_booked
+            
+            # IMPORTANT: Set to PENDING for admin approval
+            review.status = 'PENDING'  # Changed to 'PENDING' for moderation
+            
+            # Link to booking if exists
+            booking = Booking.objects.filter(
+                customer=request.user,
+                resource=resource,
+                status='CONFIRMED'
+            ).first()
+            if booking:
+                review.booking = booking
+            
+            review.save()
+            
+            # Send confirmation email
+            send_review_submitted_email(review)
+            
+            messages.success(request, 'Your review has been submitted and is awaiting admin approval.')
+            return redirect('resource_detail', resource_id=resource.id)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ReviewForm()
+    
+    context = {
+        'resource': resource,
+        'form': form,
+        'has_booked': has_booked,
+    }
+    return render(request, 'bookings/write_review.html', context)
+
+@login_required
+def edit_review(request, review_id):
+    """View for editing a review"""
+    review = get_object_or_404(Review, id=review_id, user=request.user)
+    
+    if review.status == 'APPROVED':
+        messages.warning(request, 'This review has been approved and cannot be edited.')
+        return redirect('resource_detail', resource_id=review.resource.id)
+    
+    if request.method == 'POST':
+        form = ReviewForm(request.POST, instance=review)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your review has been updated.')
+            return redirect('resource_detail', resource_id=review.resource.id)
+    else:
+        form = ReviewForm(instance=review)
+    
+    context = {
+        'review': review,
+        'form': form,
+        'resource': review.resource,
+    }
+    return render(request, 'bookings/edit_review.html', context)
+
+@login_required
+def delete_review(request, review_id):
+    """View for deleting a review"""
+    review = get_object_or_404(Review, id=review_id, user=request.user)
+    
+    if request.method == 'POST':
+        review.delete()
+        messages.success(request, 'Your review has been deleted.')
+        return redirect('resource_detail', resource_id=review.resource.id)
+    
+    return render(request, 'bookings/delete_review.html', {'review': review})
+
+@login_required
+def my_reviews(request):
+    """View for user's reviews"""
+    reviews = Review.objects.filter(user=request.user).order_by('-created_at')
+    
+    # Filter by status
+    status_filter = request.GET.get('status', 'all')
+    if status_filter != 'all':
+        reviews = reviews.filter(status=status_filter)
+    
+    context = {
+        'reviews': reviews,
+        'status_filter': status_filter,
+    }
+    return render(request, 'bookings/my_reviews.html', context)
+
+@login_required
+def resource_reviews(request, resource_id):
+    """View for all reviews of a resource"""
+    resource = get_object_or_404(Resource, id=resource_id)
+    reviews = resource.reviews.filter(status='APPROVED')
+    
+    # Filter form
+    filter_form = ReviewFilterForm(request.GET or None)
+    if filter_form.is_valid():
+        if rating := filter_form.cleaned_data.get('rating'):
+            reviews = reviews.filter(rating=rating)
+        
+        sort = filter_form.cleaned_data.get('sort', 'newest')
+        if sort == 'newest':
+            reviews = reviews.order_by('-created_at')
+        elif sort == 'oldest':
+            reviews = reviews.order_by('created_at')
+        elif sort == 'highest':
+            reviews = reviews.order_by('-rating')
+        elif sort == 'lowest':
+            reviews = reviews.order_by('rating')
+        elif sort == 'helpful':
+            reviews = reviews.order_by('-helpful_count')
+    
+    # Pagination
+    paginator = Paginator(reviews, 10)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    # Statistics
+    avg_rating = resource.get_average_rating()
+    rating_count = resource.get_rating_count()
+    distribution = resource.get_rating_distribution()
+    
+    context = {
+        'resource': resource,
+        'reviews': page_obj,
+        'avg_rating': avg_rating,
+        'rating_count': rating_count,
+        'distribution': distribution,
+        'filter_form': filter_form,
+        'page_obj': page_obj,
+    }
+    return render(request, 'bookings/resource_reviews.html', context)
+
+@login_required
+def toggle_review_helpful(request, review_id):
+    """Toggle helpful status for a review"""
+    if request.method == 'POST':
+        review = get_object_or_404(Review, id=review_id)
+        review.toggle_helpful(request.user)
+        return JsonResponse({
+            'helpful_count': review.helpful_count,
+            'is_helpful': review.is_helpful(request.user)
+        })
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+def my_review_history(request):
+    """View for user's review history"""
+    reviews = Review.objects.filter(user=request.user).order_by('-created_at')
+    total = reviews.count()
+    approved = reviews.filter(status='APPROVED').count()
+    pending = reviews.filter(status='PENDING').count()
+    rejected = reviews.filter(status='REJECTED').count()
+    
+    context = {
+        'reviews': reviews,
+        'total': total,
+        'approved': approved,
+        'pending': pending,
+        'rejected': rejected,
+    }
+    return render(request, 'bookings/my_review_history.html', context)
+
+@staff_member_required
+def admin_reviews(request):
+    """Admin view for managing all reviews"""
+    reviews = Review.objects.all().order_by('-created_at')
+    
+    # Get filter parameters
+    status_filter = request.GET.get('status', 'all')
+    rating_filter = request.GET.get('rating', 'all')
+    search_query = request.GET.get('search', '')
+    
+    # Apply filters
+    if status_filter != 'all':
+        reviews = reviews.filter(status=status_filter)
+    
+    if rating_filter != 'all':
+        reviews = reviews.filter(rating=rating_filter)
+    
+    if search_query:
+        reviews = reviews.filter(
+            Q(comment__icontains=search_query) |
+            Q(title__icontains=search_query) |
+            Q(user__username__icontains=search_query) |
+            Q(resource__name__icontains=search_query)
+        )
+    
+    # Pagination
+    paginator = Paginator(reviews, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    # Statistics
+    total = Review.objects.count()
+    pending = Review.objects.filter(status='PENDING').count()
+    approved = Review.objects.filter(status='APPROVED').count()
+    rejected = Review.objects.filter(status='REJECTED').count()
+    
+    # Get all resources for filter
+    resources = Resource.objects.filter(reviews__isnull=False).distinct()
+    
+    context = {
+        'reviews': page_obj,
+        'total': total,
+        'pending': pending,
+        'approved': approved,
+        'rejected': rejected,
+        'status_filter': status_filter,
+        'rating_filter': rating_filter,
+        'search_query': search_query,
+        'resources': resources,
+        'page_obj': page_obj,
+        'rating_choices': Review.RATING_CHOICES,
+        'status_choices': Review.STATUS_CHOICES,
+    }
+    return render(request, 'bookings/admin/admin_reviews.html', context)
+
+@staff_member_required
+def admin_review_detail(request, review_id):
+    """View for admin to see review details and moderate"""
+    review = get_object_or_404(Review, id=review_id)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        reason = request.POST.get('moderation_reason', '')
+        
+        if action == 'approve':
+            review.moderate('APPROVED', request.user, None)
+            messages.success(request, f'Review #{review.id} has been approved.')
+            send_review_approved_email(review)
+            
+        elif action == 'reject':
+            if not reason:
+                messages.error(request, 'Please provide a reason for rejection.')
+                return redirect('admin_review_detail', review_id=review.id)
+            review.moderate('REJECTED', request.user, reason)
+            messages.success(request, f'Review #{review.id} has been rejected.')
+            send_review_rejected_email(review)
+            
+        elif action == 'reject-approved':
+            # Handle rejection of an approved review
+            if not reason:
+                messages.error(request, 'Please provide a reason for rejection.')
+                return redirect('admin_review_detail', review_id=review.id)
+            review.moderate('REJECTED', request.user, reason)
+            messages.success(request, f'Review #{review.id} has been rejected and removed from public view.')
+            send_review_rejected_email(review)
+            
+        elif action == 'delete':
+            review.delete()
+            messages.success(request, 'Review has been deleted.')
+            return redirect('admin_reviews')
+        
+        return redirect('admin_reviews')
+    
+    context = {
+        'review': review,
+        'review_status_choices': Review.STATUS_CHOICES,
+    }
+    return render(request, 'bookings/admin/admin_review_detail.html', context)
+
+@staff_member_required
+def admin_bulk_action_reviews(request):
+    """Bulk action for reviews"""
+    if request.method == 'POST':
+        review_ids = request.POST.getlist('review_ids')
+        action = request.POST.get('action')
+        reason = request.POST.get('moderation_reason', '')
+        
+        if not review_ids:
+            messages.error(request, 'No reviews selected.')
+            return redirect('admin_reviews')
+        
+        reviews = Review.objects.filter(id__in=review_ids)
+        count = reviews.count()
+        
+        if action == 'approve':
+            for review in reviews:
+                review.moderate('APPROVED', request.user, None)
+                send_review_approved_email(review)
+            messages.success(request, f'{count} reviews have been approved.')
+            
+        elif action == 'reject':
+            if not reason:
+                messages.error(request, 'Please provide a reason for rejection.')
+                return redirect('admin_reviews')
+            for review in reviews:
+                review.moderate('REJECTED', request.user, reason)
+                send_review_rejected_email(review)
+            messages.success(request, f'{count} reviews have been rejected.')
+            
+        elif action == 'delete':
+            for review in reviews:
+                review.delete()
+            messages.success(request, f'{count} reviews have been deleted.')
+        
+        return redirect('admin_reviews')
+    
+    return redirect('admin_reviews')
