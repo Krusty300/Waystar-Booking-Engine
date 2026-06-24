@@ -24,10 +24,12 @@ urlpatterns = [
     # Admin resource management
     path('manage-resources/', views.admin_manage_resources, name='admin_manage_resources'),
     path('manage-resource/<int:resource_id>/status/', views.admin_update_resource_status, name='admin_update_resource_status'),
+    path('analytics/', views.admin_dashboard, name='admin_dashboard'),
     
     # Booking management
     path('my-bookings/', views.my_bookings, name='my_bookings'),
     path('cancel-booking/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
+    path('my-bookings/export/', views.export_bookings, name='export_bookings'),
     
     # Authentication
     path('signup/', views.signup, name='signup'),

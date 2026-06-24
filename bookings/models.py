@@ -312,6 +312,47 @@ class Booking(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    def get_duration(self):
+        """Get booking duration in hours"""
+        duration = (self.end_time - self.start_time).total_seconds() / 3600
+        return round(duration, 1)
+    
+    def get_status_icon(self):
+        """Get status icon for display"""
+        icons = {
+            'PENDING': 'Pending',
+            'CONFIRMED': 'Confirmed',
+            'CANCELLED': 'Cancelled',
+            'COMPLETED': 'Completed',
+        }
+        return icons.get(self.status, '📋')
+    
+    def get_status_color(self):
+        """Get status color for display"""
+        colors = {
+            'PENDING': '#ffc107',
+            'CONFIRMED': '#28a745',
+            'CANCELLED': '#dc3545',
+            'COMPLETED': '#17a2b8',
+        }
+        return colors.get(self.status, '#6c757d')
+    
+    def can_cancel(self):
+        """Check if booking can be cancelled"""
+        if self.status in ['CANCELLED', 'COMPLETED']:
+            return False
+        if self.start_time <= timezone.now():
+            return False
+        return True
+    
+    def is_upcoming(self):
+        """Check if booking is upcoming"""
+        return self.start_time > timezone.now() and self.status in ['PENDING', 'CONFIRMED']
+    
+    def is_past(self):
+        """Check if booking is past"""
+        return self.start_time <= timezone.now() and self.status != 'CANCELLED'
+
 class UserProfile(models.Model):
     """Extended user profile information"""
     user = models.OneToOneField(

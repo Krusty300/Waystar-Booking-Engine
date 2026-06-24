@@ -344,7 +344,7 @@ function refreshData() {
     const btn = event ? event.target : document.getElementById('refreshBtn');
     if (btn) {
         const originalText = btn.textContent;
-        btn.textContent = '⏳ Loading...';
+        btn.textContent = 'Loading...';
         btn.disabled = true;
     }
     
@@ -361,9 +361,9 @@ function refreshData() {
             createCharts();
             
             if (btn) {
-                btn.textContent = '🔄 Refreshed!';
+                btn.textContent = 'Refreshed!';
                 setTimeout(() => {
-                    btn.textContent = '🔄 Refresh';
+                    btn.textContent = 'Refresh';
                     btn.disabled = false;
                 }, 2000);
             }
@@ -371,9 +371,9 @@ function refreshData() {
         .catch(error => {
             console.error('Error refreshing data:', error);
             if (btn) {
-                btn.textContent = '❌ Error';
+                btn.textContent = 'Error';
                 setTimeout(() => {
-                    btn.textContent = '🔄 Refresh';
+                    btn.textContent = 'Refresh';
                     btn.disabled = false;
                 }, 2000);
             }
@@ -385,11 +385,11 @@ function toggleAutoRefresh() {
     if (autoRefreshInterval) {
         clearInterval(autoRefreshInterval);
         autoRefreshInterval = null;
-        btn.textContent = '⏰ Auto-Refresh: OFF';
+        btn.textContent = 'Auto-Refresh: OFF';
         btn.style.background = '#17a2b8';
     } else {
         autoRefreshInterval = setInterval(refreshData, 30000); // 30 seconds
-        btn.textContent = '⏰ Auto-Refresh: ON';
+        btn.textContent = 'Auto-Refresh: ON';
         btn.style.background = '#28a745';
     }
 }

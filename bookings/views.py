@@ -17,7 +17,12 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.views.generic import TemplateView
 from calendar import monthcalendar, month_name
 from datetime import datetime, timedelta
+from django.db.models import Q
+from django.core.paginator import Paginator
 import calendar
+from django.contrib.auth import logout
+from django.contrib import messages
+from django.shortcuts import redirect
 import json
 
 # Import analytics service after all other imports
@@ -329,27 +334,74 @@ def delete_category(request, category_id):
 
 @login_required
 def my_bookings(request):
-    """Show the current user's bookings with filtering"""
+    """Show the current user's bookings with enhanced filtering and pagination"""
     # Get all bookings
     all_bookings = Booking.objects.filter(customer=request.user)
     
-    # Get filter parameter from URL
+    # Get filter parameters
     status_filter = request.GET.get('status', 'all')
+    date_filter = request.GET.get('date', 'all')
+    search_query = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', '-start_time')
     
-    # Apply filter
+    # Apply status filter
     if status_filter == 'upcoming':
         bookings = all_bookings.filter(
             start_time__gte=timezone.now(),
             status__in=['PENDING', 'CONFIRMED']
-        ).order_by('start_time')
+        )
     elif status_filter == 'past':
         bookings = all_bookings.filter(
-            models.Q(start_time__lt=timezone.now()) | models.Q(status='COMPLETED')
-        ).order_by('-start_time')
+            Q(start_time__lt=timezone.now()) | Q(status='COMPLETED')
+        )
     elif status_filter == 'cancelled':
-        bookings = all_bookings.filter(status='CANCELLED').order_by('-start_time')
+        bookings = all_bookings.filter(status='CANCELLED')
+    elif status_filter == 'pending':
+        bookings = all_bookings.filter(status='PENDING')
+    elif status_filter == 'confirmed':
+        bookings = all_bookings.filter(status='CONFIRMED')
     else:  # 'all'
-        bookings = all_bookings.order_by('-start_time')
+        bookings = all_bookings
+    
+    # Apply date filter
+    now = timezone.now()
+    if date_filter == 'today':
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        bookings = bookings.filter(start_time__gte=today_start, start_time__lte=today_end)
+    elif date_filter == 'week':
+        week_start = now - timedelta(days=7)
+        bookings = bookings.filter(start_time__gte=week_start)
+    elif date_filter == 'month':
+        month_start = now - timedelta(days=30)
+        bookings = bookings.filter(start_time__gte=month_start)
+    elif date_filter == 'upcoming_dates':
+        bookings = bookings.filter(start_time__gte=now)
+    
+    # Apply search
+    if search_query:
+        bookings = bookings.filter(
+            Q(resource__name__icontains=search_query) |
+            Q(resource__description__icontains=search_query) |
+            Q(notes__icontains=search_query)
+        )
+    
+    # Apply sorting
+    if sort_by == 'start_time':
+        bookings = bookings.order_by('start_time')
+    elif sort_by == 'end_time':
+        bookings = bookings.order_by('end_time')
+    elif sort_by == 'resource':
+        bookings = bookings.order_by('resource__name')
+    elif sort_by == 'status':
+        bookings = bookings.order_by('status')
+    else:  # '-start_time'
+        bookings = bookings.order_by('-start_time')
+    
+    # Pagination
+    paginator = Paginator(bookings, 10)  # 10 bookings per page
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
     
     # Calculate statistics
     total = all_bookings.count()
@@ -358,18 +410,33 @@ def my_bookings(request):
         status__in=['PENDING', 'CONFIRMED']
     ).count()
     past = all_bookings.filter(
-        models.Q(start_time__lt=timezone.now()) | models.Q(status='COMPLETED')
+        Q(start_time__lt=timezone.now()) | Q(status='COMPLETED')
     ).count()
     cancelled = all_bookings.filter(status='CANCELLED').count()
+    pending = all_bookings.filter(status='PENDING').count()
+    confirmed = all_bookings.filter(status='CONFIRMED').count()
+    
+    # Get upcoming bookings for quick view
+    upcoming_bookings = all_bookings.filter(
+        start_time__gte=timezone.now(),
+        status__in=['PENDING', 'CONFIRMED']
+    ).order_by('start_time')[:3]
     
     context = {
-        'bookings': bookings,
+        'bookings': page_obj,
         'total': total,
         'upcoming': upcoming,
         'past': past,
         'cancelled': cancelled,
+        'pending': pending,
+        'confirmed': confirmed,
         'current_filter': status_filter,
+        'current_date_filter': date_filter,
+        'search_query': search_query,
+        'sort_by': sort_by,
         'now': timezone.now(),
+        'upcoming_bookings': upcoming_bookings,
+        'page_obj': page_obj,
     }
     return render(request, 'bookings/my_bookings.html', context)
 
@@ -388,6 +455,35 @@ def cancel_booking(request, booking_id):
         messages.success(request, 'Booking cancelled successfully.')
     
     return redirect('my_bookings')
+
+@login_required
+def export_bookings(request):
+    """Export bookings as CSV"""
+    import csv
+    from django.http import HttpResponse
+    
+    bookings = Booking.objects.filter(customer=request.user).order_by('-start_time')
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="my_bookings_{timezone.now().strftime("%Y%m%d")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['ID', 'Resource', 'Start Time', 'End Time', 'Duration (hours)', 'Status', 'Notes', 'Created At'])
+    
+    for booking in bookings:
+        writer.writerow([
+            booking.id,
+            booking.resource.name,
+            booking.start_time.strftime('%Y-%m-%d %H:%M'),
+            booking.end_time.strftime('%Y-%m-%d %H:%M'),
+            booking.get_duration(),
+            booking.get_status_display(),
+            booking.notes or '',
+            booking.created_at.strftime('%Y-%m-%d %H:%M'),
+        ])
+    
+    return response
+
 
 # ============ API ENDPOINTS ============
 
@@ -1016,3 +1112,10 @@ class CalendarView(TemplateView):
             return JsonResponse({'error': str(e)}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+
+
+def custom_logout(request):
+    """Custom logout view that allows GET requests"""
+    logout(request)
+    messages.success(request, 'You have been successfully logged out.')
+    return redirect('/')
