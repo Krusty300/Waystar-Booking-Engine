@@ -77,3 +77,9 @@ dmypy.json
 *.pid
 *.seed
 *.pid.lock
+
+# Database
+db.sqlite3
+db.sqlite3-journal
+*.sqlite3
+*.db
