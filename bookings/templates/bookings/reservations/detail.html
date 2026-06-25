@@ -33,6 +33,51 @@
         {% endif %}
     </div>
 
+    <!-- Equipment Owner Card -->
+    <div class="equipment-owner-card">
+        <div class="owner-header">
+            <span class="owner-title">Equipment Owner</span>
+        </div>
+        <div class="owner-content">
+            <div class="owner-avatar">
+                {% if reservation.equipment.owner %}
+                    {% if reservation.equipment.owner.profile.profile_picture %}
+                        <img src="{{ reservation.equipment.owner.profile.profile_picture.url }}" alt="{{ reservation.equipment.owner.username }}" class="owner-avatar-small">
+                    {% else %}
+                        <span class="owner-avatar-placeholder">{{ reservation.equipment.owner.username|first|upper }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="avatar-placeholder">?</span>
+                {% endif %}
+            </div>
+            <div class="owner-details">
+                {% if reservation.equipment.owner %}
+                    <div class="owner-name">
+                        <strong>{{ reservation.equipment.owner.username }}</strong>
+                        {% if reservation.equipment.owner == request.user %}
+                            <span class="you-badge-large">(You)</span>
+                        {% endif %}
+                    </div>
+                    <div class="owner-email">{{ reservation.equipment.owner.email }}</div>
+                    <div class="owner-since">Equipment owner since: {{ reservation.equipment.created_at|date:"M d, Y" }}</div>
+                {% else %}
+                    <div class="no-owner-text">No owner assigned to this equipment</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="owner-actions">
+            {% if reservation.equipment.owner %}
+                <!-- Link to equipment list filtered by owner (working) -->
+                <a href="{% url 'equipment_list' %}?owner={{ reservation.equipment.owner.id }}" class="btn-view-owner-equipment">
+                View Owner's Equipment
+                </a>
+            {% endif %}
+            <a href="{% url 'equipment_detail' reservation.equipment.id %}" class="btn-view-equipment">
+                View Equipment
+            </a>
+        </div>
+    </div>
+
     <!-- Detail Grid -->
     <div class="detail-grid">
         <!-- Left Column: Reservation Info -->
@@ -44,6 +89,19 @@
                     <td>
                         <strong>{{ reservation.equipment.name }}</strong>
                         <span class="serial-text">{{ reservation.equipment.serial_number }}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Equipment Owner</th>
+                    <td>
+                        {% if reservation.equipment.owner %}
+                            {{ reservation.equipment.owner.username }}
+                            {% if reservation.equipment.owner == request.user %}
+                                <span class="you-badge">(You)</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="no-owner">No owner assigned</span>
+                        {% endif %}
                     </td>
                 </tr>
                 <tr>
@@ -96,135 +154,176 @@
         </div>
 
         <!-- Right Column: Actions -->
-<div class="detail-card">
-    <h2>Actions</h2>
-    <div class="action-buttons">
-        
-        <!-- CONFIRM BUTTON - ONLY FOR STAFF -->
-        {% if can_confirm %}
-            <form method="post" action="{% url 'confirm_reservation' reservation.id %}" style="width: 100%;">
-                {% csrf_token %}
-                <button type="submit" class="btn-confirm-reservation" 
-                        onclick="return confirm('Confirm this reservation?')">
-                    Confirm Reservation
-                </button>
-            </form>
-        {% endif %}
-        
-        <!-- CANCEL BUTTON - FOR USER OR STAFF -->
-        {% if can_cancel %}
-            <form method="post" action="{% url 'cancel_reservation' reservation.id %}" style="width: 100%;">
-                {% csrf_token %}
-                <button type="submit" class="btn-cancel-reservation" 
-                        onclick="return confirm('Cancel this reservation?')">
-                    Cancel Reservation
-                </button>
-            </form>
-        {% endif %}
-        
-        <a href="{% url 'equipment_detail' reservation.equipment.id %}" class="btn-view-equipment">
-            View Equipment
-        </a>
-        
-        <a href="{% url 'reservation_calendar' %}" class="btn-view-calendar">
-            View Calendar
-        </a>
-    </div>
-</div>
+        <div class="detail-card">
+            <h2>Actions</h2>
+            <div class="action-buttons">
+                {% if can_cancel %}
+                    <form method="post" action="{% url 'cancel_reservation' reservation.id %}" style="width: 100%;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-cancel-reservation" 
+                                onclick="return confirm('Cancel this reservation?')">
+                            Cancel Reservation
+                        </button>
+                    </form>
+                {% endif %}
+                
+                {% if can_confirm %}
+                    <form method="post" action="{% url 'confirm_reservation' reservation.id %}" style="width: 100%;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-confirm-reservation" 
+                                onclick="return confirm('Confirm this reservation?')">
+                            Confirm Reservation
+                        </button>
+                    </form>
+                {% endif %}
+                
+                <a href="{% url 'equipment_detail' reservation.equipment.id %}" class="btn-view-equipment">
+                    View Equipment
+                </a>
+                
+                <a href="{% url 'reservation_calendar' %}" class="btn-view-calendar">
+                    View Calendar
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 
 <style>
-.reservation-detail-container {
-    max-width: 1000px;
-    margin: 0 auto;
-}
-
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* ===== Equipment Owner Card ===== */
+.equipment-owner-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    padding: 20px;
     margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 2px solid #e9ecef;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
 }
 
-.page-header h1 {
-    margin: 0;
-    font-size: 1.6rem;
+.owner-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.owner-icon {
+    font-size: 1.2rem;
+}
+
+.owner-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #495057;
+}
+
+.owner-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+}
+
+.owner-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #007bff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.owner-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    color: white;
+    font-size: 1.2rem;
     font-weight: 700;
 }
 
-.page-header .subtitle {
-    margin: 4px 0 0;
-    color: #6c757d;
-    font-size: 0.85rem;
+.owner-details {
+    flex: 1;
 }
 
-.btn-back {
-    display: inline-block;
-    padding: 8px 16px;
-    background: #f8f9fa;
-    color: #495057;
-    text-decoration: none;
-    border: 1px solid #dee2e6;
-    font-size: 0.85rem;
-    font-weight: 500;
-    transition: all 0.2s;
+.owner-name {
+    font-size: 1rem;
 }
 
-.btn-back:hover {
-    background: #e9ecef;
-}
-
-.status-banner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
-    margin-bottom: 24px;
-    border-left: 4px solid;
-}
-
-.status-banner.status-pending {
-    background: #fff3cd;
-    border-left-color: #ffc107;
-}
-
-.status-banner.status-confirmed {
-    background: #d4edda;
-    border-left-color: #28a745;
-}
-
-.status-banner.status-cancelled {
-    background: #f8d7da;
-    border-left-color: #dc3545;
-}
-
-.status-banner.status-expired {
-    background: #e2e3e5;
-    border-left-color: #6c757d;
-}
-
-.status-banner.status-completed {
-    background: #d1ecf1;
-    border-left-color: #17a2b8;
-}
-
-.status-icon {
-    font-size: 1.5rem;
-}
-
-.status-text {
-    font-size: 0.95rem;
-}
-
-.status-expiry {
-    margin-left: auto;
+.owner-email {
     font-size: 0.8rem;
     color: #6c757d;
 }
 
+.owner-since {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.you-badge-large {
+    background: #28a745;
+    color: white;
+    padding: 2px 12px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+.no-owner-text {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.owner-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.btn-view-owner-equipment {
+    padding: 6px 16px;
+    background: #17a2b8;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-view-owner-equipment:hover {
+    background: #138496;
+    color: white;
+}
+
+.btn-view-equipment {
+    padding: 6px 16px;
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-view-equipment:hover {
+    background: #0056b3;
+    color: white;
+}
+
+/* ===== Detail Grid ===== */
 .detail-grid {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -276,18 +375,20 @@
     color: #6c757d;
 }
 
-.status-badge {
-    display: inline-block;
-    padding: 3px 12px;
-    font-size: 0.7rem;
+.you-badge {
+    background: #28a745;
+    color: white;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.6rem;
     font-weight: 600;
+    margin-left: 4px;
 }
 
-.status-pending .status-badge { background: #fff3cd; color: #856404; }
-.status-confirmed .status-badge { background: #d4edda; color: #155724; }
-.status-cancelled .status-badge { background: #f8d7da; color: #721c24; }
-.status-expired .status-badge { background: #e2e3e5; color: #383d41; }
-.status-completed .status-badge { background: #d1ecf1; color: #0c5460; }
+.no-owner {
+    color: #6c757d;
+    font-style: italic;
+}
 
 .purpose-section,
 .notes-section {
@@ -312,6 +413,7 @@
     line-height: 1.6;
 }
 
+/* ===== Action Buttons ===== */
 .action-buttons {
     display: flex;
     flex-direction: column;
@@ -370,88 +472,139 @@
     color: white;
 }
 
-/* Confirm Button - Staff Only */
-.btn-confirm-reservation {
-    padding: 10px 16px;
-    background: #28a745;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+/* ===== Status Banner ===== */
+.status-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    margin-bottom: 24px;
+    border-left: 4px solid;
+}
+
+.status-banner.status-pending {
+    background: #fff3cd;
+    border-left-color: #ffc107;
+}
+
+.status-banner.status-confirmed {
+    background: #d4edda;
+    border-left-color: #28a745;
+}
+
+.status-banner.status-cancelled {
+    background: #f8d7da;
+    border-left-color: #dc3545;
+}
+
+.status-banner.status-expired {
+    background: #e2e3e5;
+    border-left-color: #6c757d;
+}
+
+.status-banner.status-completed {
+    background: #d1ecf1;
+    border-left-color: #17a2b8;
+}
+
+.status-icon {
+    font-size: 1.5rem;
+}
+
+.status-text {
+    font-size: 0.95rem;
+}
+
+.status-expiry {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* ===== Page Header ===== */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.page-header h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+.page-header .subtitle {
+    margin: 4px 0 0;
+    color: #6c757d;
     font-size: 0.85rem;
-    font-weight: 600;
-    width: 100%;
-    transition: all 0.2s ease;
 }
 
-.btn-confirm-reservation:hover {
-    background: #218838;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
-}
-
-/* Cancel Button */
-.btn-cancel-reservation {
-    padding: 10px 16px;
-    background: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+.btn-back {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #f8f9fa;
+    color: #495057;
+    text-decoration: none;
+    border: 1px solid #dee2e6;
     font-size: 0.85rem;
-    font-weight: 600;
-    width: 100%;
-    transition: all 0.2s ease;
-}
-
-.btn-cancel-reservation:hover {
-    background: #c82333;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
-}
-
-/* Confirm button in list view */
-.btn-confirm {
-    padding: 4px 12px;
-    background: #28a745;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 600;
-    transition: background 0.2s;
-}
-
-.btn-confirm:hover {
-    background: #218838;
-}
-
-/* Admin Banner */
-.admin-banner {
-    background: #cce5ff;
-    padding: 10px 16px;
-    margin-bottom: 16px;
-    border-left: 4px solid #007bff;
-    color: #004085;
     font-weight: 500;
+    transition: all 0.2s;
 }
 
-/* Staff-only stat cards */
-.stat-expired .stat-number { color: #6c757d; }
-.stat-completed .stat-number { color: #17a2b8; }
+.btn-back:hover {
+    background: #e9ecef;
+}
 
+/* ===== Status Badge ===== */
+.status-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
 
+.status-pending .status-badge { background: #fff3cd; color: #856404; }
+.status-confirmed .status-badge { background: #d4edda; color: #155724; }
+.status-cancelled .status-badge { background: #f8d7da; color: #721c24; }
+.status-expired .status-badge { background: #e2e3e5; color: #383d41; }
+.status-completed .status-badge { background: #d1ecf1; color: #0c5460; }
 
-@media (max-width: 768px) {
+/* ===== Responsive ===== */
+@media (max-width: 992px) {
     .detail-grid {
         grid-template-columns: 1fr;
     }
-    
+}
+
+@media (max-width: 768px) {
     .page-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
+    }
+    
+    .equipment-owner-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .owner-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .owner-actions {
+        width: 100%;
+    }
+    
+    .owner-actions a {
+        flex: 1;
+        text-align: center;
     }
     
     .status-banner {
@@ -461,6 +614,33 @@
     .status-expiry {
         margin-left: 0;
         width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .equipment-owner-card {
+        padding: 16px;
+    }
+    
+    .owner-avatar {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .avatar-placeholder {
+        font-size: 1rem;
+    }
+    
+    .detail-card {
+        padding: 16px;
+    }
+    
+    .detail-table {
+        font-size: 0.8rem;
+    }
+    
+    .detail-table th {
+        width: 40%;
     }
 }
 </style>

@@ -103,6 +103,14 @@
                     <strong>{{ equipment.name }}</strong>
                     <span class="preview-serial">{{ equipment.serial_number }}</span>
                     <span class="preview-condition">{{ equipment.get_condition_display }}</span>
+                    <!-- OWNER INFO -->
+                    <span class="preview-owner">
+                    {% if equipment.owner %}
+                        {{ equipment.owner.username }}
+                    {% else %}
+                        No owner
+                    {% endif %}
+                    </span>
                 </div>
             {% empty %}
                 <p class="no-equipment">No equipment available</p>

@@ -598,14 +598,24 @@ def book_slot(request):
 
 
 @login_required
-def profile(request):
+def profile(request, user_id=None):
     """View for user profile with booking history"""
+    if user_id:
+        # Viewing someone else's profile (staff only)
+        if not request.user.is_staff:
+            messages.error(request, 'You do not have permission to view this profile.')
+            return redirect('profile')
+        user = get_object_or_404(User, id=user_id)
+    else:
+        # Viewing own profile
+        user = request.user
+    
     # Safety net: create profile if it doesn't exist
-    profile, created = UserProfile.objects.get_or_create(user=request.user)
-    if created:
+    profile, created = UserProfile.objects.get_or_create(user=user)
+    if created and user == request.user:
         messages.info(request, "Your profile was created automatically.")
     
-    bookings = Booking.objects.filter(customer=request.user).order_by('-created_at')
+    bookings = Booking.objects.filter(customer=user).order_by('-created_at')
     
     # Get booking stats
     stats = profile.get_booking_stats()
@@ -619,12 +629,17 @@ def profile(request):
         status__in=['PENDING', 'CONFIRMED']
     ).order_by('start_time')[:5]
     
+    # Check if viewing own profile
+    is_own_profile = (user == request.user)
+    
     context = {
+        'profile_user': user,
         'profile': profile,
         'stats': stats,
         'recent_bookings': recent_bookings,
         'upcoming_bookings': upcoming_bookings,
         'now': timezone.now(),
+        'is_own_profile': is_own_profile,
     }
     return render(request, 'bookings/profile.html', context)
 

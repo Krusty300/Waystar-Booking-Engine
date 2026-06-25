@@ -71,7 +71,23 @@
             {% for reservation in reservations %}
     <div class="reservation-card status-{{ reservation.status|lower }}">
         <div class="card-header">
-            <h3>{{ reservation.equipment.name }}</h3>
+            <div>
+                <h3>{{ reservation.equipment.name }}</h3>
+                <!-- OWNER INFO HERE -->
+                <div class="equipment-owner-info">
+                    <span class="owner-label">Owner:</span>
+                    {% if reservation.equipment.owner %}
+                        <span class="owner-name">
+                            {{ reservation.equipment.owner.username }}
+                            {% if reservation.equipment.owner == request.user %}
+                                <span class="you-badge">(You)</span>
+                            {% endif %}
+                        </span>
+                    {% else %}
+                        <span class="no-owner">No owner assigned</span>
+                    {% endif %}
+                </div>
+            </div>
             <span class="status-badge status-{{ reservation.status|lower }}">
                 {{ reservation.get_display_status }}
             </span>

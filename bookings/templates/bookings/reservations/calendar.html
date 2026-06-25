@@ -44,6 +44,14 @@
                                         <span class="tooltip-status status-{{ reservation.status|lower }}">
                                             {{ reservation.get_status_display }}
                                         </span>
+                                        <!-- ADD OWNER INFO -->
+                                        <span class="tooltip-owner">
+                                        {% if reservation.equipment.owner %}
+                                        {{ reservation.equipment.owner.username }}
+                                        {% else %}
+                                        No owner
+                                        {% endif %}
+                                        </span>
                                     </div>
                                 {% endfor %}
                             </div>

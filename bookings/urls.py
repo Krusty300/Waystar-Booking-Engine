@@ -17,6 +17,7 @@ urlpatterns = [
 
     # ============ USER PROFILE ============
     path('profile/', views.profile, name='profile'),
+    path('profile/<int:user_id>/', views.profile, name='profile_detail'),
     path('profile/edit/', views.edit_profile, name='edit_profile'),
     path('profile/change-password/', views.change_password, name='change_password'),
     path('booking-history/', views.booking_history, name='booking_history'),
