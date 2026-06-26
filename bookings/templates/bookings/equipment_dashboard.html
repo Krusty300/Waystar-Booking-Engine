@@ -10,10 +10,6 @@
         </div>
         <div class="header-actions">
             <a href="{% url 'create_equipment' %}" class="btn-primary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
                 Add Equipment
             </a>
         </div>
@@ -163,10 +159,6 @@
                     <p class="add-description">Add new equipment to your inventory</p>
                     <div class="add-actions">
                         <a href="{% url 'create_equipment' %}" class="btn-add-equipment">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="12" y1="5" x2="12" y2="19"/>
-                                <line x1="5" y1="12" x2="19" y2="12"/>
-                            </svg>
                             Add New Equipment
                         </a>
                         <a href="{% url 'equipment_list' %}" class="btn-browse-equipment">
@@ -388,7 +380,7 @@ function quickReturn(rentalId) {
     background: #007bff;
     color: white;
     border: none;
-    border-radius: 0px;
+    border-radius: 10px;
     text-decoration: none;
     font-weight: 600;
     font-size: 0.85rem;
@@ -418,6 +410,7 @@ function quickReturn(rentalId) {
     align-items: center;
     gap: 12px;
     transition: all 0.2s ease;
+    border-radius: 10px;
 }
 
 .stat-card:hover {
@@ -541,7 +534,7 @@ function quickReturn(rentalId) {
 .action-item .item-status {
     font-size: 0.65rem;
     padding: 1px 8px;
-    border-radius: 0;
+    border-radius: 0px;
 }
 
 .action-item .item-due {
@@ -563,7 +556,7 @@ function quickReturn(rentalId) {
     font-size: 0.6rem;
     padding: 1px 8px;
     background: #e9ecef;
-    border-radius: 0;
+    border-radius: 0px;
 }
 
 .type-routine { background: #d1ecf1; color: #0c5460; }
@@ -780,7 +773,7 @@ function quickReturn(rentalId) {
 .activity-status {
     font-size: 0.65rem;
     padding: 1px 8px;
-    border-radius: 0;
+    border-radius: 10px;
 }
 
 .empty-message {

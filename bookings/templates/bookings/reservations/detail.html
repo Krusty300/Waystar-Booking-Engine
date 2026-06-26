@@ -157,34 +157,36 @@
         <div class="detail-card">
             <h2>Actions</h2>
             <div class="action-buttons">
-                {% if can_cancel %}
-                    <form method="post" action="{% url 'cancel_reservation' reservation.id %}" style="width: 100%;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn-cancel-reservation" 
-                                onclick="return confirm('Cancel this reservation?')">
-                            Cancel Reservation
-                        </button>
-                    </form>
-                {% endif %}
-                
-                {% if can_confirm %}
-                    <form method="post" action="{% url 'confirm_reservation' reservation.id %}" style="width: 100%;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn-confirm-reservation" 
-                                onclick="return confirm('Confirm this reservation?')">
-                            Confirm Reservation
-                        </button>
-                    </form>
-                {% endif %}
-                
-                <a href="{% url 'equipment_detail' reservation.equipment.id %}" class="btn-view-equipment">
-                    View Equipment
-                </a>
-                
-                <a href="{% url 'reservation_calendar' %}" class="btn-view-calendar">
-                    View Calendar
-                </a>
-            </div>
+    <!-- Confirm button - Staff OR Equipment Owner -->
+    {% if can_confirm %}
+        <form method="post" action="{% url 'confirm_reservation' reservation.id %}" style="width: 100%;">
+            {% csrf_token %}
+            <button type="submit" class="btn-confirm-reservation" 
+                    onclick="return confirm('Confirm this reservation?')">
+                Confirm Reservation
+            </button>
+        </form>
+    {% endif %}
+    
+    <!-- Cancel button - User OR Equipment Owner OR Staff -->
+    {% if can_cancel %}
+        <form method="post" action="{% url 'cancel_reservation' reservation.id %}" style="width: 100%;">
+            {% csrf_token %}
+            <button type="submit" class="btn-cancel-reservation" 
+                    onclick="return confirm('Cancel this reservation?')">
+                Cancel Reservation
+            </button>
+        </form>
+    {% endif %}
+    
+    <a href="{% url 'equipment_detail' reservation.equipment.id %}" class="btn-view-equipment">
+        View Equipment
+    </a>
+    
+    <a href="{% url 'reservation_calendar' %}" class="btn-view-calendar">
+        View Calendar
+    </a>
+</div>
         </div>
     </div>
 </div>
@@ -273,7 +275,7 @@
     background: #28a745;
     color: white;
     padding: 2px 12px;
-    border-radius: 12px;
+    border-radius: 0px;
     font-size: 0.7rem;
     font-weight: 600;
     margin-left: 6px;
@@ -379,7 +381,7 @@
     background: #28a745;
     color: white;
     padding: 1px 8px;
-    border-radius: 10px;
+    border-radius: 0px;
     font-size: 0.6rem;
     font-weight: 600;
     margin-left: 4px;

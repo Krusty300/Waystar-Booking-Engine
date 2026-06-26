@@ -98,9 +98,20 @@ class MeetingRoom(models.Model):
     default_setup_time = models.IntegerField(default=15, help_text="Default setup time in minutes")
     default_teardown_time = models.IntegerField(default=15, help_text="Default teardown time in minutes")
     
+    # ✅ FIXED: Added validate_image_size validator to image fields
     # Documents
-    floor_plan = models.ImageField(upload_to='floor_plans/', blank=True, null=True)
-    room_photo = models.ImageField(upload_to='room_photos/', blank=True, null=True)
+    floor_plan = models.ImageField(
+        upload_to='floor_plans/', 
+        blank=True, 
+        null=True,
+        validators=[validate_image_size]  # ✅ Added validator
+    )
+    room_photo = models.ImageField(
+        upload_to='room_photos/', 
+        blank=True, 
+        null=True,
+        validators=[validate_image_size]  # ✅ Added validator
+    )
     
     # Additional info
     notes = models.TextField(blank=True, help_text="Any additional notes about the room")
@@ -213,12 +224,14 @@ class Resource(models.Model):
         upload_to='room_photos/', 
         blank=True, 
         null=True,
+        validators=[validate_image_size],  # ✅ Added validator
         help_text="Upload a photo of the room"
     )
     floor_plan = models.ImageField(
         upload_to='floor_plans/', 
         blank=True, 
         null=True,
+        validators=[validate_image_size],  # ✅ Added validator
         help_text="Upload a floor plan of the room"
     )
     

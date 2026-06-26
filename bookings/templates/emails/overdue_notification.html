@@ -1,0 +1,55 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}OVERDUE - {{ equipment.name }}{% endblock %}
+{% block header %}Rental Overdue!{% endblock %}
+{% block subtitle %}Your equipment rental is past the return date{% endblock %}
+
+{% block content %}
+<h2>Hello {{ rental.rented_by.username }},</h2>
+
+<p>
+    <strong style="color: #dc3545;">Your rental of {{ equipment.name }} is now OVERDUE!</strong>
+</p>
+
+<p>Please return the equipment immediately to avoid additional penalties.</p>
+
+<table class="details-table">
+    <tr>
+        <td class="label">Equipment</td>
+        <td class="value"><strong>{{ equipment.name }}</strong></td>
+    </tr>
+    <tr>
+        <td class="label">Serial Number</td>
+        <td class="value">{{ equipment.serial_number }}</td>
+    </tr>
+    <tr>
+        <td class="label">Expected Return</td>
+        <td class="value">{{ rental.expected_return_date|date:"M d, Y H:i" }}</td>
+    </tr>
+    <tr>
+        <td class="label">Days Overdue</td>
+        <td class="value">
+            <strong style="color: #dc3545;">{{ days_overdue }} days</strong>
+        </td>
+    </tr>
+    <tr>
+        <td class="label">Status</td>
+        <td class="value">
+            <span class="status-badge status-overdue">Overdue</span>
+        </td>
+    </tr>
+</table>
+
+<p>
+    <strong>Late fees may apply for overdue rentals.</strong>
+</p>
+
+<div style="text-align: center; margin: 20px 0;">
+    <a href="{{ site_url }}/my-rentals/" class="button" style="background: #dc3545;">Return Now</a>
+</div>
+
+<p style="margin-top: 20px; font-size: 14px; color: #6c757d;">
+    If you have already returned the equipment, please ignore this message.
+    For any questions, contact our support team.
+</p>
+{% endblock %}

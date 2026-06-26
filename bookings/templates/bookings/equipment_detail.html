@@ -22,7 +22,7 @@
             </div>
         </div>
         <div class="header-actions">
-            <a href="{% url 'equipment_list' %}" class="btn-back">Back to Equipment</a>
+            <a href="{% url 'my_equipment' %}" class="btn-back">Back to My Equipment</a>
         </div>
     </div>
 
@@ -111,7 +111,7 @@
                     {% endwith %}
                 {% elif equipment.status == 'MAINTENANCE' %}
                     <div class="action-maintenance">
-                        <p class="status-message maintenance">🔧 Currently under maintenance</p>
+                        <p class="status-message maintenance">Currently under maintenance</p>
                         <p>This equipment is not available for rental until maintenance is completed.</p>
                     </div>
                 {% elif equipment.status == 'RETIRED' %}

@@ -1,0 +1,24 @@
+Booking Engine - Rental Confirmed
+
+Hello {{ rental.rented_by.username }},
+
+Your rental of {{ equipment.name }} has been confirmed and is now active.
+
+Rental Details:
+----------------
+Equipment: {{ equipment.name }}
+Serial Number: {{ equipment.serial_number }}
+Checkout Date: {{ rental.checkout_date|date:"M d, Y H:i" }}
+Expected Return: {{ rental.expected_return_date|date:"M d, Y H:i" }}
+Status: Confirmed
+{% if rental.condition_on_checkout %}Condition on Checkout: {{ rental.condition_on_checkout }}{% endif %}
+
+Please note: Equipment must be returned by the expected return date. Late returns may incur penalties.
+
+View your rentals: {{ site_url }}/my-rentals/
+View equipment: {{ site_url }}/equipment/{{ equipment.id }}/
+
+If you have any questions, please contact our support team.
+
+---
+© {% now "Y" %} Booking Engine. All rights reserved.

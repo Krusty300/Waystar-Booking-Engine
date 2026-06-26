@@ -116,12 +116,14 @@
 
     <!-- Actions -->
     <div class="action-section">
+    {% if can_complete or maintenance.equipment.owner == request.user %}
         {% if maintenance.status != 'COMPLETED' and maintenance.status != 'CANCELLED' %}
             <button onclick="completeMaintenance({{ maintenance.id }})" class="btn-complete-maintenance">
-                ✓ Mark as Completed
+                Mark as Completed
             </button>
         {% endif %}
-        <a href="{% url 'equipment_maintenance' %}" class="btn-secondary-action">Back to Maintenance</a>
+    {% endif %}
+    <a href="{% url 'equipment_maintenance' %}" class="btn-secondary-action">Back to Maintenance</a>
     </div>
 </div>
 

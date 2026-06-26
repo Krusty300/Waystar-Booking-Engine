@@ -1,0 +1,62 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Return Reminder - {{ equipment.name }}{% endblock %}
+{% block header %}Return Reminder{% endblock %}
+{% block subtitle %}Your equipment rental is due soon{% endblock %}
+
+{% block content %}
+<h2>Hello {{ rental.rented_by.username }},</h2>
+
+<p>This is a reminder that your rental of <strong>{{ equipment.name }}</strong> is due for return.</p>
+
+<table class="details-table">
+    <tr>
+        <td class="label">Equipment</td>
+        <td class="value"><strong>{{ equipment.name }}</strong></td>
+    </tr>
+    <tr>
+        <td class="label">Serial Number</td>
+        <td class="value">{{ equipment.serial_number }}</td>
+    </tr>
+    <tr>
+        <td class="label">Checkout Date</td>
+        <td class="value">{{ rental.checkout_date|date:"M d, Y" }}</td>
+    </tr>
+    <tr>
+        <td class="label">Expected Return</td>
+        <td class="value">
+            <strong>{{ rental.expected_return_date|date:"M d, Y H:i" }}</strong>
+            {% if days_left <= 1 %}
+                <span style="color: #dc3545;">(Tomorrow!)</span>
+            {% elif days_left <= 3 %}
+                <span style="color: #ffc107;">(In {{ days_left }} days)</span>
+            {% endif %}
+        </td>
+    </tr>
+    <tr>
+        <td class="label">Days Left</td>
+        <td class="value">
+            {% if days_left == 1 %}
+                <strong style="color: #dc3545;">1 day</strong>
+            {% elif days_left <= 3 %}
+                <strong style="color: #ffc107;">{{ days_left }} days</strong>
+            {% else %}
+                <strong>{{ days_left }} days</strong>
+            {% endif %}
+        </td>
+    </tr>
+</table>
+
+<p>
+    <strong>Please ensure the equipment is returned in good condition.</strong>
+</p>
+
+<div style="text-align: center;">
+    <a href="{{ site_url }}/my-rentals/" class="button">Return Now</a>
+    <a href="{{ site_url }}/equipment/{{ equipment.id }}/" class="button button-secondary">View Equipment</a>
+</div>
+
+<p style="margin-top: 20px; font-size: 14px; color: #6c757d;">
+    If you need to extend the rental, please contact support as soon as possible.
+</p>
+{% endblock %}

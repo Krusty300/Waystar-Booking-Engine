@@ -1,0 +1,42 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Reservation Reminder - {{ equipment.name }}{% endblock %}
+{% block header %}Reservation Reminder{% endblock %}
+{% block subtitle %}Your equipment reservation starts tomorrow{% endblock %}
+
+{% block content %}
+<h2>Hello {{ reservation.user.username }},</h2>
+
+<p>This is a reminder that your equipment reservation starts <strong>tomorrow</strong>.</p>
+
+<table class="details-table">
+    <tr>
+        <td class="label">Equipment</td>
+        <td class="value"><strong>{{ equipment.name }}</strong></td>
+    </tr>
+    <tr>
+        <td class="label">Serial Number</td>
+        <td class="value">{{ equipment.serial_number }}</td>
+    </tr>
+    <tr>
+        <td class="label">Start Date</td>
+        <td class="value">{{ reservation.start_date|date:"M d, Y H:i" }}</td>
+    </tr>
+    <tr>
+        <td class="label">End Date</td>
+        <td class="value">{{ reservation.end_date|date:"M d, Y H:i" }}</td>
+    </tr>
+    <tr>
+        <td class="label">Location</td>
+        <td class="value">{{ equipment.location|default:"Not specified" }}</td>
+    </tr>
+</table>
+
+<div style="text-align: center;">
+    <a href="{{ site_url }}/reservations/{{ reservation.id }}/" class="button">View Reservation</a>
+</div>
+
+<p style="margin-top: 20px; font-size: 14px; color: #6c757d;">
+    Please arrive on time to collect your equipment. If you need to cancel, please do so as soon as possible.
+</p>
+{% endblock %}

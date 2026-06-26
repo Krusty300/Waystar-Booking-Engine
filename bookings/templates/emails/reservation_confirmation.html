@@ -1,0 +1,55 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Reservation Confirmed - {{ equipment.name }}{% endblock %}
+{% block header %}Reservation Confirmed!{% endblock %}
+{% block subtitle %}Your equipment reservation has been confirmed{% endblock %}
+
+{% block content %}
+<h2>Hello {{ reservation.user.username }},</h2>
+
+<p>Your reservation for <strong>{{ equipment.name }}</strong> has been confirmed.</p>
+
+<table class="details-table">
+    <tr>
+        <td class="label">Equipment</td>
+        <td class="value"><strong>{{ equipment.name }}</strong></td>
+    </tr>
+    <tr>
+        <td class="label">Serial Number</td>
+        <td class="value">{{ equipment.serial_number }}</td>
+    </tr>
+    <tr>
+        <td class="label">Start Date</td>
+        <td class="value">{{ reservation.start_date|date:"M d, Y H:i" }}</td>
+    </tr>
+    <tr>
+        <td class="label">End Date</td>
+        <td class="value">{{ reservation.end_date|date:"M d, Y H:i" }}</td>
+    </tr>
+    <tr>
+        <td class="label">Duration</td>
+        <td class="value">{{ reservation.get_duration_days }} days</td>
+    </tr>
+    <tr>
+        <td class="label">Status</td>
+        <td class="value">
+            <span class="status-badge status-confirmed">Confirmed</span>
+        </td>
+    </tr>
+    {% if reservation.purpose %}
+    <tr>
+        <td class="label">Purpose</td>
+        <td class="value">{{ reservation.purpose }}</td>
+    </tr>
+    {% endif %}
+</table>
+
+<div style="text-align: center;">
+    <a href="{{ site_url }}/reservations/{{ reservation.id }}/" class="button">View Reservation</a>
+    <a href="{{ site_url }}/equipment/{{ equipment.id }}/" class="button button-secondary">View Equipment</a>
+</div>
+
+<p style="margin-top: 20px; font-size: 14px; color: #6c757d;">
+    Please arrive on time to collect your equipment.
+</p>
+{% endblock %}

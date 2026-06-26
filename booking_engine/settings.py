@@ -150,3 +150,18 @@ MAX_UPLOAD_SIZE = 5242880
 
 # Dark Mode Settings
 SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+
+# Email Settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Or your email provider
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'your-email@gmail.com'
+EMAIL_HOST_PASSWORD = 'your-app-password'
+DEFAULT_FROM_EMAIL = 'noreply@bookingengine.com'
+
+# For development, you can use console backend
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Site URL for email links
+SITE_URL = 'http://127.0.0.1:8000'  # Change to your production URL

@@ -375,8 +375,7 @@
 
       <div style="margin-bottom: 8px">{{ form.image }}</div>
       <small style="color: #6c757d; font-size: 0.7rem; display: block">
-        {{ form.image.help_text|default:"Upload an image (JPG, PNG, GIF, WebP).
-        Max 5MB." }}
+        Upload an image (JPG, PNG, GIF, WebP). Max 5MB.
       </small>
 
       <div id="image-preview-container" style="margin-top: 10px; display: none">
@@ -423,12 +422,12 @@
       style="
         margin: 20px 0;
         border: none;
-        border-top: 2px solid var(--border-color);
+        border-top: 2px solid #e9ecef;
       "
     />
 
     <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 15px">
-      🏢 Meeting Room Images
+      Meeting Room Images
     </h3>
 
     <!-- Room Photo -->
@@ -440,7 +439,7 @@
           margin-bottom: 5px;
           font-weight: 600;
           font-size: 0.85rem;
-          color: var(--text-primary);
+          color: #1a1a2e;
         "
       >
         Room Photo
@@ -452,12 +451,12 @@
       >
         <img
           src="{{ resource.meeting_room.room_photo.url }}"
-          alt="Room photo"
+          alt="Room photo for {{ resource.name }}"
           style="
             max-width: 300px;
             max-height: 200px;
             object-fit: cover;
-            border: 2px solid var(--border-color);
+            border: 2px solid #e9ecef;
           "
         />
         <div
@@ -477,9 +476,9 @@
       </div>
       {% endif %}
 
-      {{ form.room_photo }}
-      <small style="color: var(--text-secondary); font-size: 0.7rem"
-        >{{ form.room_photo.help_text }}</small
+      <div style="margin-bottom: 8px">{{ form.room_photo }}</div>
+      <small style="color: #6c757d; font-size: 0.7rem; display: block"
+        >Upload a photo of the meeting room (JPG, PNG, GIF, WebP). Max 5MB.</small
       >
 
       <div
@@ -489,7 +488,7 @@
         <img
           id="room-photo-preview"
           src="#"
-          alt="Preview"
+          alt="Room photo preview"
           style="
             max-width: 300px;
             max-height: 200px;
@@ -512,7 +511,7 @@
           margin-bottom: 5px;
           font-weight: 600;
           font-size: 0.85rem;
-          color: var(--text-primary);
+          color: #1a1a2e;
         "
       >
         Floor Plan
@@ -524,12 +523,12 @@
       >
         <img
           src="{{ resource.meeting_room.floor_plan.url }}"
-          alt="Floor plan"
+          alt="Floor plan for {{ resource.name }}"
           style="
             max-width: 300px;
             max-height: 200px;
             object-fit: cover;
-            border: 2px solid var(--border-color);
+            border: 2px solid #e9ecef;
           "
         />
         <div
@@ -549,9 +548,10 @@
       </div>
       {% endif %}
 
-      {{ form.floor_plan }}
-      <small style="color: var(--text-secondary); font-size: 0.7rem"
-        >{{ form.floor_plan.help_text }}</small
+      <div style="margin-bottom: 8px">{{ form.floor_plan }}</div>
+      <small style="color: #6c757d; font-size: 0.7rem; display: block"
+        >Upload a floor plan of the meeting room (JPG, PNG, GIF, WebP). Max
+        5MB.</small
       >
 
       <div
@@ -561,7 +561,7 @@
         <img
           id="floor-plan-preview"
           src="#"
-          alt="Preview"
+          alt="Floor plan preview"
           style="
             max-width: 300px;
             max-height: 200px;
@@ -712,7 +712,7 @@
         tagPreview.innerHTML = tags
           .map(
             (tag) =>
-              `<span style="background: #e9ecef; padding: 2px 10px; font-size: 0.7rem; color: #333;">${tag}</span>`
+              `<span style="background: #e9ecef; padding: 2px 10px; font-size: 0.7rem; color: #333; border-radius: 0;">${tag}</span>`
           )
           .join("");
       });
@@ -809,6 +809,10 @@
   @media (max-width: 600px) {
     div[style*="grid-template-columns: 1fr 1fr"] {
       grid-template-columns: 1fr !important;
+    }
+    
+    .meeting-room-images-section {
+      padding: 10px;
     }
   }
 </style>

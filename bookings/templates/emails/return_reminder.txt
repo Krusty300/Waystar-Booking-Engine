@@ -1,0 +1,22 @@
+Booking Engine - Return Reminder
+
+Hello {{ rental.rented_by.username }},
+
+This is a reminder that your rental of {{ equipment.name }} is due for return.
+
+Rental Details:
+----------------
+Equipment: {{ equipment.name }}
+Serial Number: {{ equipment.serial_number }}
+Checkout Date: {{ rental.checkout_date|date:"M d, Y" }}
+Expected Return: {{ rental.expected_return_date|date:"M d, Y H:i" }}
+Days Left: {{ days_left }} days
+
+Please ensure the equipment is returned in good condition.
+
+Return now: {{ site_url }}/my-rentals/
+
+If you need to extend the rental, please contact support as soon as possible.
+
+---
+© {% now "Y" %} Booking Engine. All rights reserved.

@@ -1,0 +1,56 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Rental Confirmed - {{ equipment.name }}{% endblock %}
+{% block header %}Rental Confirmed!{% endblock %}
+{% block subtitle %}Your equipment rental has been confirmed{% endblock %}
+
+{% block content %}
+<h2>Hello {{ rental.rented_by.username }},</h2>
+
+<p>Your rental of <strong>{{ equipment.name }}</strong> has been confirmed and is now active.</p>
+
+<table class="details-table">
+    <tr>
+        <td class="label">Equipment</td>
+        <td class="value"><strong>{{ equipment.name }}</strong></td>
+    </tr>
+    <tr>
+        <td class="label">Serial Number</td>
+        <td class="value">{{ equipment.serial_number }}</td>
+    </tr>
+    <tr>
+        <td class="label">Checkout Date</td>
+        <td class="value">{{ rental.checkout_date|date:"M d, Y H:i" }}</td>
+    </tr>
+    <tr>
+        <td class="label">Expected Return</td>
+        <td class="value">{{ rental.expected_return_date|date:"M d, Y H:i" }}</td>
+    </tr>
+    <tr>
+        <td class="label">Status</td>
+        <td class="value">
+            <span class="status-badge status-confirmed">Confirmed</span>
+        </td>
+    </tr>
+    {% if rental.condition_on_checkout %}
+    <tr>
+        <td class="label">Condition on Checkout</td>
+        <td class="value">{{ rental.condition_on_checkout }}</td>
+    </tr>
+    {% endif %}
+</table>
+
+<p>
+    <strong>Please note:</strong> Equipment must be returned by the expected return date. 
+    Late returns may incur penalties.
+</p>
+
+<div style="text-align: center;">
+    <a href="{{ site_url }}/my-rentals/" class="button">View My Rentals</a>
+    <a href="{{ site_url }}/equipment/{{ equipment.id }}/" class="button button-secondary">View Equipment</a>
+</div>
+
+<p style="margin-top: 20px; font-size: 14px; color: #6c757d;">
+    If you have any questions, please contact our support team.
+</p>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Weekly Rental Summary{% endblock %}
+{% block header %}Weekly Rental Summary{% endblock %}
+{% block subtitle %}Your rental activity for this week{% endblock %}
+
+{% block content %}
+<h2>Hello {{ user.username }},</h2>
+
+<p>Here's your rental activity summary for the past week:</p>
+
+<h3>Active Rentals</h3>
+<table class="details-table">
+    <thead>
+        <tr>
+            <th style="padding: 10px 15px; background: #e9ecef; text-align: left;">Equipment</th>
+            <th style="padding: 10px 15px; background: #e9ecef; text-align: left;">Due Date</th>
+            <th style="padding: 10px 15px; background: #e9ecef; text-align: left;">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for rental in active_rentals %}
+        <tr>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e9ecef;">{{ rental.equipment.name }}</td>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e9ecef;">{{ rental.expected_return_date|date:"M d" }}</td>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e9ecef;">
+                {% if rental.is_overdue %}
+                    <span class="status-badge status-overdue">Overdue</span>
+                {% else %}
+                    <span class="status-badge status-confirmed">Active</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="3" style="padding: 10px 15px; text-align: center; color: #6c757d;">No active rentals</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Upcoming Reservations</h3>
+<table class="details-table">
+    <thead>
+        <tr>
+            <th style="padding: 10px 15px; background: #e9ecef; text-align: left;">Equipment</th>
+            <th style="padding: 10px 15px; background: #e9ecef; text-align: left;">Start Date</th>
+            <th style="padding: 10px 15px; background: #e9ecef; text-align: left;">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for reservation in upcoming_reservations %}
+        <tr>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e9ecef;">{{ reservation.equipment.name }}</td>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e9ecef;">{{ reservation.start_date|date:"M d" }}</td>
+            <td style="padding: 10px 15px; border-bottom: 1px solid #e9ecef;">
+                <span class="status-badge status-confirmed">Confirmed</span>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="3" style="padding: 10px 15px; text-align: center; color: #6c757d;">No upcoming reservations</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div style="text-align: center; margin-top: 20px;">
+    <a href="{{ site_url }}/my-rentals/" class="button">View All Rentals</a>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+Booking Engine - Rental Overdue
+
+Hello {{ rental.rented_by.username }},
+
+Your rental of {{ equipment.name }} is now OVERDUE!
+
+Please return the equipment immediately to avoid additional penalties.
+
+Rental Details:
+----------------
+Equipment: {{ equipment.name }}
+Serial Number: {{ equipment.serial_number }}
+Expected Return: {{ rental.expected_return_date|date:"M d, Y H:i" }}
+Days Overdue: {{ days_overdue }} days
+Status: Overdue
+
+Late fees may apply for overdue rentals.
+
+Return now: {{ site_url }}/my-rentals/
+
+If you have already returned the equipment, please ignore this message.
+
+---
+© {% now "Y" %} Booking Engine. All rights reserved.

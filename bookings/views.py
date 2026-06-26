@@ -5,11 +5,12 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.utils import timezone
-from django.db import models
+from django.db import models, transaction
 from datetime import datetime, timedelta
 from .models import (
     Resource, Booking, Category, UserProfile, AnalyticsEvent, DailyAnalytics, 
-    Equipment, EquipmentRental, MaintenanceRecord, EquipmentCategory, Review
+    Equipment, EquipmentRental, MaintenanceRecord, EquipmentCategory, Review,
+    MeetingRoom, Amenity, SavedSearch, EquipmentReservation
 )
 from .services import BookingService
 from .services.equipment_service import EquipmentService
@@ -17,7 +18,7 @@ from .export_service import ExportService
 from .forms import (
     SignUpForm, ResourceForm, ResourceStatusForm, CategoryForm, 
     UserProfileForm, UserSettingsForm, ReviewForm, ReviewFilterForm,
-    EquipmentForm
+    EquipmentForm, MeetingRoomForm  # Added MeetingRoomForm
 )
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
@@ -29,17 +30,11 @@ from django.core.paginator import Paginator
 from .email_service import send_review_submitted_email, send_review_approved_email, send_review_rejected_email
 from django.contrib.auth import logout
 import calendar
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django.utils import timezone
 import csv
 import json
 from io import BytesIO
-from datetime import datetime
 from .services.search_service import SearchService
-from .models import SavedSearch
 from .services.reservation_service import ReservationService
-from .models import EquipmentReservation
 
 # Import analytics service after all other imports
 from .analytics_service import AnalyticsService
@@ -213,21 +208,43 @@ def edit_resource(request, resource_id):
         return redirect('my_resources')
     
     if request.method == 'POST':
+        # Handle main resource form
         form = ResourceForm(request.POST, request.FILES, instance=resource)
+        
         if form.is_valid():
-            form.save()
+            resource = form.save()
+            
+            # Handle meeting room separately if this is a meeting room
+            if resource.is_meeting_room():
+                meeting_room_form = MeetingRoomForm(
+                    request.POST,
+                    request.FILES,  # IMPORTANT: Pass FILES for image uploads
+                    instance=resource.meeting_room
+                )
+                if meeting_room_form.is_valid():
+                    meeting_room_form.save()
+                else:
+                    # If meeting room form has errors, show them
+                    for field, errors in meeting_room_form.errors.items():
+                        for error in errors:
+                            messages.error(request, f'{field}: {error}')
+                    return redirect('edit_resource', resource_id=resource.id)
+            
             messages.success(request, f'Resource "{resource.name}" updated successfully!')
             return redirect('my_resources')
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
         form = ResourceForm(instance=resource)
+        meeting_room_form = MeetingRoomForm(instance=resource.meeting_room) if resource.is_meeting_room() else None
     
-    return render(request, 'bookings/resource_form.html', {
-        'form': form, 
+    context = {
+        'form': form,
         'resource': resource,
-        'title': 'Edit Resource'
-    })
+        'meeting_room_form': meeting_room_form,
+        'title': 'Edit Resource',
+    }
+    return render(request, 'bookings/resource_form.html', context)
 
 @login_required
 def delete_resource(request, resource_id):
@@ -472,35 +489,6 @@ def cancel_booking(request, booking_id):
     
     return redirect('my_bookings')
 
-@login_required
-def export_bookings(request):
-    """Export bookings as CSV"""
-    import csv
-    from django.http import HttpResponse
-    
-    bookings = Booking.objects.filter(customer=request.user).order_by('-start_time')
-    
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="my_bookings_{timezone.now().strftime("%Y%m%d")}.csv"'
-    
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Resource', 'Start Time', 'End Time', 'Duration (hours)', 'Status', 'Notes', 'Created At'])
-    
-    for booking in bookings:
-        writer.writerow([
-            booking.id,
-            booking.resource.name,
-            booking.start_time.strftime('%Y-%m-%d %H:%M'),
-            booking.end_time.strftime('%Y-%m-%d %H:%M'),
-            booking.get_duration(),
-            booking.get_status_display(),
-            booking.notes or '',
-            booking.created_at.strftime('%Y-%m-%d %H:%M'),
-        ])
-    
-    return response
-
-
 # ============ API ENDPOINTS ============
 
 @login_required
@@ -596,6 +584,7 @@ def book_slot(request):
     except Exception as e:
         return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
 
+# ============ USER PROFILE VIEWS ============
 
 @login_required
 def profile(request, user_id=None):
@@ -739,7 +728,6 @@ def booking_history(request):
     }
     return render(request, 'bookings/booking_history.html', context)
 
-
 # ============ ANALYTICS VIEWS ============
 
 @staff_member_required
@@ -880,6 +868,7 @@ def export_report(request):
     
     return HttpResponse('Invalid format', status=400)
 
+# ============ CALENDAR VIEW ============
 
 class CalendarView(TemplateView):
     """Calendar view showing resource availability with direct booking"""
@@ -1108,7 +1097,18 @@ class CalendarView(TemplateView):
         from django.core.exceptions import ValidationError
         
         try:
-            data = json.loads(request.body)
+            # Check if request is JSON
+            if request.content_type and 'application/json' in request.content_type:
+                data = json.loads(request.body)
+            else:
+                # Handle form data
+                data = {
+                    'resource_id': request.POST.get('resource_id'),
+                    'start_time': request.POST.get('start_time'),
+                    'end_time': request.POST.get('end_time'),
+                    'notes': request.POST.get('notes', ''),
+                }
+            
             resource_id = data.get('resource_id')
             start_time_str = data.get('start_time')
             end_time_str = data.get('end_time')
@@ -1125,6 +1125,18 @@ class CalendarView(TemplateView):
             if timezone.is_naive(end_time):
                 end_time = timezone.make_aware(end_time)
             
+            # Check if booking already exists before creating
+            existing_booking = Booking.objects.filter(
+                resource_id=resource_id,
+                start_time=start_time,
+                end_time=end_time
+            ).exists()
+            
+            if existing_booking:
+                return JsonResponse({
+                    'error': 'This time slot is already booked. Please select another slot.'
+                }, status=400)
+            
             booking = BookingService.create_booking(
                 resource_id=resource_id,
                 customer=request.user,
@@ -1139,17 +1151,22 @@ class CalendarView(TemplateView):
                 'message': f'Booking confirmed for {booking.start_time.strftime("%I:%M %p")}'
             })
             
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
         except ValidationError as e:
             return JsonResponse({'error': str(e)}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
+# ============ CUSTOM LOGOUT ============
 
 def custom_logout(request):
     """Custom logout view that allows GET requests"""
     logout(request)
     messages.success(request, 'You have been successfully logged out.')
     return redirect('/')
+
+# ============ REVIEW VIEWS ============
 
 @login_required
 def write_review(request, resource_id):
@@ -1336,6 +1353,8 @@ def my_review_history(request):
     }
     return render(request, 'bookings/my_review_history.html', context)
 
+# ============ ADMIN REVIEW VIEWS ============
+
 @staff_member_required
 def admin_reviews(request):
     """Admin view for managing all reviews"""
@@ -1474,6 +1493,8 @@ def admin_bulk_action_reviews(request):
     
     return redirect('admin_reviews')
 
+# ============ EQUIPMENT RENTAL VIEWS ============
+
 @login_required
 def equipment_list(request):
     """List all equipment with filtering"""
@@ -1523,7 +1544,6 @@ def equipment_list(request):
     }
     return render(request, 'bookings/equipment_list.html', context)
 
-
 @login_required
 def equipment_detail(request, equipment_id):
     """Show equipment details and rental history"""
@@ -1556,6 +1576,17 @@ def rent_equipment(request):
     equipment_id = request.POST.get('equipment_id')
     expected_return_date_str = request.POST.get('expected_return_date')
     condition_notes = request.POST.get('condition_notes', '')
+
+    if rental:
+        # Send confirmation email
+        from .services.notification_service import NotificationService
+        NotificationService.send_rental_confirmation(rental)
+        
+        return JsonResponse({
+            'success': True,
+            'rental_id': rental.id,
+            'message': f'Equipment successfully rented until {rental.expected_return_date.strftime("%Y-%m-%d %H:%M")}'
+        })
     
     if not equipment_id or not expected_return_date_str:
         return JsonResponse({'error': 'Missing required fields'}, status=400)
@@ -1596,21 +1627,36 @@ def return_equipment(request):
         return JsonResponse({'error': 'Missing rental ID'}, status=400)
     
     try:
+        # Get the rental record first to check permissions and status
+        rental = EquipmentRental.objects.get(id=rental_id)
+        
+        # Check permission: user must be staff OR the one who rented it
+        if rental.rented_by != request.user and not request.user.is_staff:
+            return JsonResponse({'error': 'You do not have permission to return this equipment'}, status=403)
+        
+        # Check if already returned
+        if rental.status == 'CHECKED_IN':
+            return JsonResponse({'error': 'This equipment has already been returned'}, status=400)
+        
+        # Process the return using the service
         rental = EquipmentService.check_in_equipment(
             rental_id=rental_id,
             user_id=request.user.id,
             condition_notes=condition_notes
         )
         
+        # Return confirmation
         return JsonResponse({
             'success': True,
             'message': 'Equipment successfully returned'
         })
     
+    except EquipmentRental.DoesNotExist:
+        return JsonResponse({'error': 'Rental record not found'}, status=404)
     except ValidationError as e:
         return JsonResponse({'error': str(e)}, status=400)
     except Exception as e:
-        return JsonResponse({'error': 'An error occurred. Please try again.'}, status=500)
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 def my_rentals(request):
@@ -1670,17 +1716,17 @@ def my_rentals(request):
     }
     return render(request, 'bookings/my_rentals.html', context)
 
+# ============ MAINTENANCE VIEWS ============
+
 @login_required
 def equipment_maintenance(request):
     """View for managing equipment maintenance - Users can manage their own equipment, Staff can manage all"""
     
     # Get equipment based on user role
     if request.user.is_staff:
-        # Staff can see ALL equipment
         equipment_list = Equipment.objects.all()
         maintenance_records = MaintenanceRecord.objects.all().order_by('-scheduled_date')[:50]
     else:
-        # Regular users can only see their OWN equipment
         equipment_list = Equipment.objects.filter(owner=request.user)
         maintenance_records = MaintenanceRecord.objects.filter(
             equipment__owner=request.user
@@ -1716,6 +1762,10 @@ def equipment_maintenance(request):
                     vendor=vendor
                 )
                 
+                # Send notification to equipment owner
+                from .services.notification_service import NotificationService
+                NotificationService.send_maintenance_scheduled(maintenance)
+                
                 messages.success(request, f'Maintenance scheduled for {maintenance.equipment.name}')
                 return redirect('equipment_maintenance')
             
@@ -1726,7 +1776,7 @@ def equipment_maintenance(request):
         else:
             messages.error(request, 'Please fill in all required fields')
     
-    # Calculate maintenance statistics based on user role
+    # Calculate maintenance statistics
     if request.user.is_staff:
         total_records = MaintenanceRecord.objects.count()
         scheduled_count = MaintenanceRecord.objects.filter(status='SCHEDULED').count()
@@ -1734,7 +1784,6 @@ def equipment_maintenance(request):
         completed_count = MaintenanceRecord.objects.filter(status='COMPLETED').count()
         cancelled_count = MaintenanceRecord.objects.filter(status='CANCELLED').count()
     else:
-        # Users only see stats for their equipment
         user_equipment_ids = Equipment.objects.filter(owner=request.user).values_list('id', flat=True)
         total_records = MaintenanceRecord.objects.filter(equipment__id__in=user_equipment_ids).count()
         scheduled_count = MaintenanceRecord.objects.filter(
@@ -1768,28 +1817,8 @@ def equipment_maintenance(request):
     return render(request, 'bookings/equipment_maintenance.html', context)
 
 @login_required
-def maintenance_detail(request, maintenance_id):
-    """View for displaying a single maintenance record"""
-    maintenance = get_object_or_404(MaintenanceRecord, id=maintenance_id)
-    
-    # Check if user can view this maintenance
-    if not request.user.is_staff and maintenance.equipment.owner != request.user:
-        messages.error(request, 'You do not have permission to view this maintenance record.')
-        return redirect('equipment_maintenance')
-    
-    context = {
-        'maintenance': maintenance,
-        'equipment': maintenance.equipment,
-        'can_complete': request.user.is_staff,  # Only staff can complete
-        'can_edit': request.user.is_staff or maintenance.equipment.owner == request.user,
-    }
-    return render(request, 'bookings/maintenance_detail.html', context)
-
-
-@login_required
-@user_passes_test(lambda u: u.is_staff)  # Keep this staff-only
 def complete_maintenance(request):
-    """Handle completing maintenance via AJAX - Staff Only"""
+    """Handle completing maintenance via AJAX - Staff OR Equipment Owner"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
@@ -1801,7 +1830,16 @@ def complete_maintenance(request):
     
     try:
         with transaction.atomic():
+            # Get the maintenance record
             maintenance = MaintenanceRecord.objects.select_for_update().get(id=maintenance_id)
+            
+            # Check if user is authorized (staff OR equipment owner)
+            is_authorized = request.user.is_staff or maintenance.equipment.owner == request.user
+            
+            if not is_authorized:
+                return JsonResponse({
+                    'error': 'You do not have permission to complete this maintenance. Only the equipment owner or staff can complete maintenance.'
+                }, status=403)
             
             # Check if already completed
             if maintenance.status == 'COMPLETED':
@@ -1822,9 +1860,20 @@ def complete_maintenance(request):
             equipment.status = 'AVAILABLE'
             equipment.save()
             
+            # Send notification to equipment owner (if not the one completing)
+            try:
+                from .services.notification_service import NotificationService
+                if maintenance.equipment.owner and maintenance.equipment.owner != request.user:
+                    NotificationService.send_maintenance_completed(maintenance)
+            except Exception as e:
+                print(f"Notification error: {e}")
+            
+            # Determine who completed it
+            completed_by = "You" if not request.user.is_staff else f"Staff ({request.user.username})"
+            
             return JsonResponse({
                 'success': True,
-                'message': f'Maintenance for "{equipment.name}" completed successfully!'
+                'message': f'Maintenance for "{equipment.name}" completed successfully by {completed_by}!'
             })
     
     except MaintenanceRecord.DoesNotExist:
@@ -1832,6 +1881,92 @@ def complete_maintenance(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+@login_required
+def maintenance_detail(request, maintenance_id):
+    """View for displaying a single maintenance record"""
+    maintenance = get_object_or_404(MaintenanceRecord, id=maintenance_id)
+    
+    # Check if user can view this maintenance
+    if not request.user.is_staff and maintenance.equipment.owner != request.user:
+        messages.error(request, 'You do not have permission to view this maintenance record.')
+        return redirect('equipment_maintenance')
+    
+    # Allow completion if staff OR equipment owner
+    can_complete = (request.user.is_staff or maintenance.equipment.owner == request.user)
+    
+    context = {
+        'maintenance': maintenance,
+        'equipment': maintenance.equipment,
+        'can_complete': can_complete,  # Updated
+        'can_edit': request.user.is_staff or maintenance.equipment.owner == request.user,
+        'is_owner': maintenance.equipment.owner == request.user,
+    }
+    return render(request, 'bookings/maintenance_detail.html', context)
+
+@login_required
+def complete_maintenance(request):
+    """Handle completing maintenance via AJAX - Staff OR Equipment Owner"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    maintenance_id = request.POST.get('maintenance_id')
+    notes = request.POST.get('notes', '')
+    
+    if not maintenance_id:
+        return JsonResponse({'error': 'Missing maintenance ID'}, status=400)
+    
+    try:
+        with transaction.atomic():
+            # Get the maintenance record
+            maintenance = MaintenanceRecord.objects.select_for_update().get(id=maintenance_id)
+            
+            # Check if user is authorized (staff OR equipment owner)
+            is_authorized = request.user.is_staff or maintenance.equipment.owner == request.user
+            
+            if not is_authorized:
+                return JsonResponse({
+                    'error': 'You do not have permission to complete this maintenance. Only the equipment owner or staff can complete maintenance.'
+                }, status=403)
+            
+            # Check if already completed
+            if maintenance.status == 'COMPLETED':
+                return JsonResponse({'error': 'This maintenance is already completed'}, status=400)
+            
+            if maintenance.status == 'CANCELLED':
+                return JsonResponse({'error': 'This maintenance has been cancelled'}, status=400)
+            
+            # Update maintenance record
+            maintenance.status = 'COMPLETED'
+            maintenance.completed_date = timezone.now().date()
+            if notes:
+                maintenance.notes = (maintenance.notes + '\n' + notes).strip() if maintenance.notes else notes
+            maintenance.save()
+            
+            # Update equipment status
+            equipment = maintenance.equipment
+            equipment.status = 'AVAILABLE'
+            equipment.save()
+            
+            # Send notification to equipment owner (if not the one completing)
+            try:
+                from .services.notification_service import NotificationService
+                if maintenance.equipment.owner and maintenance.equipment.owner != request.user:
+                    NotificationService.send_maintenance_completed(maintenance)
+            except Exception as e:
+                print(f"Notification error: {e}")
+            
+            # Determine who completed it
+            completed_by = "You" if not request.user.is_staff else f"Staff ({request.user.username})"
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Maintenance for "{equipment.name}" completed successfully by {completed_by}!'
+            })
+    
+    except MaintenanceRecord.DoesNotExist:
+        return JsonResponse({'error': 'Maintenance record not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 # ============ USER EQUIPMENT MANAGEMENT VIEWS ============
 
 @login_required
@@ -2033,6 +2168,8 @@ def equipment_dashboard(request):
     
     return render(request, 'bookings/equipment_dashboard.html', context)
 
+# ============ SEARCH VIEWS ============
+
 @login_required
 def equipment_search(request):
     """Advanced equipment search view"""
@@ -2160,6 +2297,8 @@ def export_search_results(request):
         return response
     
     return JsonResponse({'error': 'Invalid export format'}, status=400)
+
+# ============ BOOKING EXPORT VIEWS ============
 
 @login_required
 def export_bookings(request):
@@ -2298,22 +2437,33 @@ def export_bookings_pdf(request, bookings):
     doc.build(elements)
     return response
 
+# ============ RESERVATION VIEWS ============
+
 @login_required
 def reservation_list(request):
     """View all reservations"""
     
-    #IMPORTANT: Staff sees ALL reservations, regular users see only their own
+    # Staff sees ALL, Equipment Owners see reservations for their equipment, Users see their own
     if request.user.is_staff:
         reservations = EquipmentReservation.objects.all().order_by('-created_at')
     else:
-        reservations = EquipmentReservation.objects.filter(user=request.user).order_by('-created_at')
+        # Get equipment owned by the user
+        owned_equipment_ids = Equipment.objects.filter(owner=request.user).values_list('id', flat=True)
+        
+        # User can see:
+        # 1. Their own reservations (user=request.user)
+        # 2. Reservations on their equipment (equipment__owner=request.user)
+        from django.db.models import Q
+        reservations = EquipmentReservation.objects.filter(
+            Q(user=request.user) | Q(equipment__owner=request.user)
+        ).order_by('-created_at').distinct()
     
     # Filter by status
     status_filter = request.GET.get('status', 'all')
     if status_filter != 'all':
         reservations = reservations.filter(status=status_filter)
     
-    # Calculate statistics for staff vs regular user
+    # Calculate statistics
     if request.user.is_staff:
         # Staff sees all stats
         total = EquipmentReservation.objects.count()
@@ -2323,14 +2473,13 @@ def reservation_list(request):
         expired = EquipmentReservation.objects.filter(status='EXPIRED').count()
         completed = EquipmentReservation.objects.filter(status='COMPLETED').count()
     else:
-        # Regular users see only their stats
-        user_reservations = EquipmentReservation.objects.filter(user=request.user)
-        total = user_reservations.count()
-        pending = user_reservations.filter(status='PENDING').count()
-        confirmed = user_reservations.filter(status='CONFIRMED').count()
-        cancelled = user_reservations.filter(status='CANCELLED').count()
-        expired = user_reservations.filter(status='EXPIRED').count()
-        completed = user_reservations.filter(status='COMPLETED').count()
+        # Non-staff sees stats for what they can view
+        total = reservations.count()
+        pending = reservations.filter(status='PENDING').count()
+        confirmed = reservations.filter(status='CONFIRMED').count()
+        cancelled = reservations.filter(status='CANCELLED').count()
+        expired = reservations.filter(status='EXPIRED').count()
+        completed = reservations.filter(status='COMPLETED').count()
     
     context = {
         'reservations': reservations,
@@ -2342,7 +2491,8 @@ def reservation_list(request):
         'cancelled': cancelled,
         'expired': expired,
         'completed': completed,
-        'is_staff': request.user.is_staff,  # Pass to template
+        'is_staff': request.user.is_staff,
+        'is_equipment_owner': not request.user.is_staff,  # Pass to template
     }
     return render(request, 'bookings/reservations/list.html', context)
 
@@ -2407,20 +2557,43 @@ def reservation_detail(request, reservation_id):
     """View reservation details"""
     reservation = get_object_or_404(EquipmentReservation, id=reservation_id)
     
-    #Staff can view ANY reservation, users can only view their own
-    if reservation.user != request.user and not request.user.is_staff:
+    # Check if user can view this reservation
+    # Staff can view ANY, users can view their own OR if they own the equipment
+    can_view = (
+        request.user.is_staff or 
+        reservation.user == request.user or 
+        reservation.equipment.owner == request.user
+    )
+    
+    if not can_view:
         messages.error(request, 'You do not have permission to view this reservation')
         return redirect('reservation_list')
     
-    #Confirm button only shows for staff with PENDING status
-    can_confirm = request.user.is_staff and reservation.status == 'PENDING'
-    can_cancel = reservation.can_cancel() and (reservation.user == request.user or request.user.is_staff)
+    # Confirm button shows for:
+    # - Staff (all reservations)
+    # - Equipment owners (only for their equipment)
+    can_confirm = (
+        (request.user.is_staff or reservation.equipment.owner == request.user) and 
+        reservation.status == 'PENDING'
+    )
+    
+    # Cancel button shows for:
+    # - Staff (all reservations)
+    # - Equipment owners (their equipment)
+    # - The user who made the reservation
+    can_cancel = reservation.can_cancel() and (
+        request.user.is_staff or 
+        reservation.user == request.user or 
+        reservation.equipment.owner == request.user
+    )
     
     context = {
         'reservation': reservation,
         'can_cancel': can_cancel,
-        'can_confirm': can_confirm,  #Only True for staff with PENDING status
+        'can_confirm': can_confirm,
         'is_staff': request.user.is_staff,
+        'is_owner': reservation.equipment.owner == request.user,
+        'is_reserver': reservation.user == request.user,
     }
     return render(request, 'bookings/reservations/detail.html', context)
 
@@ -2431,31 +2604,85 @@ def cancel_reservation_view(request, reservation_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        reservation = ReservationService.cancel_reservation(
-            reservation_id=reservation_id,
-            user=request.user
+        reservation = EquipmentReservation.objects.select_for_update().get(id=reservation_id)
+        
+        # Check if user is authorized (owner of reservation, equipment owner, OR staff)
+        is_authorized = (
+            request.user.is_staff or 
+            reservation.user == request.user or 
+            reservation.equipment.owner == request.user
         )
-        messages.success(request, f'Reservation for {reservation.equipment.name} cancelled successfully')
+        
+        if not is_authorized:
+            messages.error(request, 'You do not have permission to cancel this reservation.')
+            return redirect('reservation_detail', reservation_id=reservation_id)
+        
+        if not reservation.can_cancel():
+            messages.error(request, f'Cannot cancel reservation with status: {reservation.get_status_display()}')
+            return redirect('reservation_detail', reservation_id=reservation_id)
+        
+        # Cancel the reservation
+        reservation.cancel()
+        
+        # Send notification
+        from .services.notification_service import NotificationService
+        NotificationService.send_reservation_cancelled(reservation)
+        
+        messages.success(request, f'Reservation for {reservation.equipment.name} cancelled successfully!')
         return redirect('reservation_list')
-    except ValidationError as e:
+        
+    except Exception as e:
         messages.error(request, str(e))
         return redirect('reservation_detail', reservation_id=reservation_id)
 
 @login_required
-@user_passes_test(lambda u: u.is_staff)
 def confirm_reservation_view(request, reservation_id):
-    """Confirm a reservation (staff only)"""
+    """Confirm a reservation (Staff OR Equipment Owner)"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        reservation = ReservationService.confirm_reservation(
-            reservation_id=reservation_id,
-            user=request.user
-        )
-        messages.success(request, f'Reservation for {reservation.equipment.name} confirmed')
+        reservation = EquipmentReservation.objects.select_for_update().get(id=reservation_id)
+        
+        # Check if user is authorized (staff OR equipment owner)
+        is_authorized = request.user.is_staff or reservation.equipment.owner == request.user
+        
+        if not is_authorized:
+            messages.error(request, 'You do not have permission to confirm this reservation.')
+            return redirect('reservation_detail', reservation_id=reservation_id)
+        
+        # Check if valid to confirm
+        if reservation.status != 'PENDING':
+            messages.error(request, f'Cannot confirm reservation with status: {reservation.get_status_display()}')
+            return redirect('reservation_detail', reservation_id=reservation_id)
+        
+        if reservation.is_expired():
+            messages.error(request, 'This reservation has expired')
+            return redirect('reservation_detail', reservation_id=reservation_id)
+        
+        # Check for conflicts again
+        conflict = EquipmentReservation.objects.filter(
+            equipment=reservation.equipment,
+            start_date__lt=reservation.end_date,
+            end_date__gt=reservation.start_date,
+            status__in=['PENDING', 'CONFIRMED']
+        ).exclude(id=reservation_id).exists()
+        
+        if conflict:
+            messages.error(request, 'A conflicting reservation has been made since this was created')
+            return redirect('reservation_detail', reservation_id=reservation_id)
+        
+        # Confirm the reservation
+        reservation.confirm()
+        
+        # Send notification
+        from .services.notification_service import NotificationService
+        NotificationService.send_reservation_confirmed(reservation)
+        
+        messages.success(request, f'Reservation for {reservation.equipment.name} confirmed successfully!')
         return redirect('reservation_detail', reservation_id=reservation_id)
-    except ValidationError as e:
+        
+    except Exception as e:
         messages.error(request, str(e))
         return redirect('reservation_detail', reservation_id=reservation_id)
 
@@ -2500,12 +2727,21 @@ def reservation_calendar(request):
     
     calendar_data = ReservationService.get_calendar_data(year, month)
     
-    # Get all reservations for the month
+    # Get ALL reservations for the month (not just PENDING and CONFIRMED)
     reservations = EquipmentReservation.objects.filter(
         start_date__year=year,
-        start_date__month=month,
-        status__in=['PENDING', 'CONFIRMED']
+        start_date__month=month
+        #Remove this filter: status__in=['PENDING', 'CONFIRMED']
     ).select_related('equipment', 'user')
+    
+    # Count reservations by status for statistics
+    status_counts = {
+        'PENDING': reservations.filter(status='PENDING').count(),
+        'CONFIRMED': reservations.filter(status='CONFIRMED').count(),
+        'CANCELLED': reservations.filter(status='CANCELLED').count(),
+        'COMPLETED': reservations.filter(status='COMPLETED').count(),
+        'EXPIRED': reservations.filter(status='EXPIRED').count(),
+    }
     
     context = {
         'calendar_data': calendar_data,
@@ -2517,5 +2753,7 @@ def reservation_calendar(request):
         'prev_year': year if month > 1 else year - 1,
         'next_month': month + 1 if month < 12 else 1,
         'next_year': year if month < 12 else year + 1,
+        'status_counts': status_counts,  # ✅ Pass status counts to template
+        'status_choices': EquipmentReservation.STATUS_CHOICES,
     }
     return render(request, 'bookings/reservations/calendar.html', context)

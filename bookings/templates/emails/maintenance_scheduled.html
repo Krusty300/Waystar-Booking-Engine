@@ -1,0 +1,59 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Maintenance Scheduled - {{ equipment.name }}{% endblock %}
+{% block header %}Maintenance Scheduled{% endblock %}
+{% block subtitle %}Maintenance has been scheduled for your equipment{% endblock %}
+
+{% block content %}
+<h2>Hello {% if maintenance.equipment.owner %}{{ maintenance.equipment.owner.username }}{% else %}Equipment Owner{% endif %},</h2>
+
+<p>Maintenance has been scheduled for <strong>{{ equipment.name }}</strong>.</p>
+
+<table class="details-table">
+    <tr>
+        <td class="label">Equipment</td>
+        <td class="value"><strong>{{ equipment.name }}</strong></td>
+    </tr>
+    <tr>
+        <td class="label">Serial Number</td>
+        <td class="value">{{ equipment.serial_number }}</td>
+    </tr>
+    <tr>
+        <td class="label">Maintenance Type</td>
+        <td class="value">{{ maintenance.get_maintenance_type_display }}</td>
+    </tr>
+    <tr>
+        <td class="label">Title</td>
+        <td class="value">{{ maintenance.title }}</td>
+    </tr>
+    <tr>
+        <td class="label">Description</td>
+        <td class="value">{{ maintenance.description }}</td>
+    </tr>
+    <tr>
+        <td class="label">Scheduled Date</td>
+        <td class="value">{{ maintenance.scheduled_date|date:"M d, Y" }}</td>
+    </tr>
+    <tr>
+        <td class="label">Status</td>
+        <td class="value">
+            <span class="status-badge status-scheduled">Scheduled</span>
+        </td>
+    </tr>
+    {% if maintenance.vendor %}
+    <tr>
+        <td class="label">Vendor</td>
+        <td class="value">{{ maintenance.vendor }}</td>
+    </tr>
+    {% endif %}
+</table>
+
+<div style="text-align: center;">
+    <a href="{{ site_url }}/equipment-maintenance/" class="button">View Maintenance</a>
+    <a href="{{ site_url }}/equipment/{{ equipment.id }}/" class="button button-secondary">View Equipment</a>
+</div>
+
+<p style="margin-top: 20px; font-size: 14px; color: #6c757d;">
+    The equipment will be unavailable during the maintenance period.
+</p>
+{% endblock %}
